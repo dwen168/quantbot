@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+yfinance
+pandas
+numpy
+requests
+newsapi-python
+transformers
+torch
+python-dotenv
+mcp
