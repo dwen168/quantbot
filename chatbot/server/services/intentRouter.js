@@ -57,10 +57,10 @@ export async function routeIntent(message) {
   const lower = text.toLowerCase();
   const ticker = extractTicker(text);
 
-  if (/\b(anchor|regime|cpi|gdp|unemployment|yield curve|risk sentiment)\b/i.test(text)) {
+  if (/\b(anchor|regime|cpi|gdp|unemployment|yield curve|risk sentiment|macro context|macro anchor|anchors)\b/i.test(text)) {
     return { intent: INTENTS.MACRO_ANCHOR, params: {} };
   }
-  if (/\b(geopolit|trade war|tariff|interest rate|rates|rba|inflation|macro|news|commodit|currency)\b/i.test(text)) {
+  if (/\b(geopolit|trade war|tariff|interest rate|rates|rba|inflation|macro|news|commodit|currency|context)\b/i.test(text)) {
     return { intent: INTENTS.MACRO_INFO, params: {} };
   }
   if (ticker && /\b(recommend|buy|sell|hold|should i|trade|target|stop loss)\b/i.test(text)) {
