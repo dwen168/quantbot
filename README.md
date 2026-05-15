@@ -1,48 +1,41 @@
-# ASX Quantitative Research Chatbot
+# QuantBot ASX MCP Server
 
-A local, fully free quantitative research assistant for ASX stocks.
+QuantBot is a local MCP server for ASX stock analysis. It exposes tools for technical
+indicators, macro context, macro anchors, stock analysis, and trade recommendations.
 
-## Prerequisites
-
-1. **Ollama**: Install from [ollama.com](https://ollama.com).
-   - Pull the model: `ollama pull llama3.3` (or `deepseek-r1`)
-2. **Python 3.10+**
-3. **Node.js 18+**
-
-## Setup & Running
-
-### 1. Python MCP Server
-The MCP server handles data fetching (yfinance, news sentiment, macro indicators).
+## Run
 
 ```bash
-cd mcp-server
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-python main.py
+pip install -e ".[dev]"
+quantbot-mcp
 ```
-The server will run on `http://localhost:8000`.
 
-### 2. Node.js Express Server
-The Express server orchestrates between Ollama and the MCP server.
+For the chatbot:
 
 ```bash
-cd server
-npm start # or node app.js
+cd chatbot
+npm install
+npm start
 ```
-The server will run on `http://localhost:3000`.
 
-### 3. Chat UI
-Open `client/index.html` in your browser.
+Then open `http://localhost:3000`.
 
-## Architecture
+The chatbot starts the Python MCP server over stdio on demand. By default it expects
+the Python virtual environment at `.venv/bin/python`; override this with
+`PYTHON_BIN` or set `MCP_SERVER_PATH` in `chatbot/.env`.
 
-- **Ollama**: Local LLM processing.
-- **Python MCP Server**: Financial data tools using `yfinance` and `FinBERT` sentiment analysis.
-- **Node.js Server**: Session management, SSE streaming, and context enrichment.
-- **SSE (Server-Sent Events)**: Real-time streaming of LLM responses.
+## Tools
 
-## Features
-- **Model Selection**: Choose from any locally installed Ollama models (e.g., llama3.3, deepseek-r1) directly from the UI.
-- **Fundamentals**: Market cap, PE, yield, etc.
-- **Quantitative Analysis**: SMA, RSI, Volatility, Trend detection.
-- **Sentiment Analysis**: Real-time news sentiment using FinBERT.
-- **Macro Context**: AU Cash rate, inflation, and structural "Macro Anchors".
+- `get_technical_indicators(ticker, period="2y")`
+- `get_macro_info()`
+- `get_macro_anchors()`
+- `analyze_stock(ticker)`
+- `recommend_stock(ticker)`
+
+## Live Smoke Tests
+
+The Python smoke tests use real Yahoo/RBA data and are skipped by default:
+
+```bash
+RUN_REAL_MARKET_TESTS=1 .venv/bin/python -m pytest
+```

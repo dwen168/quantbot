@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>QuantBot ASX Intelligence</title>
+    <link rel="stylesheet" href="/css/app.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>QuantBot</h1>
+          <span>ASX Stock Intelligence</span>
+        </div>
+        <button id="theme-toggle" class="icon-button" type="button" title="Toggle theme">T</button>
+      </header>
+
+      <main id="split-layout" class="split-layout">
+        <section class="chat-pane" aria-label="Chat">
+          <div class="chat-header">
+            <div>
+              <h2>Chat</h2>
+              <p>Ask about ASX tickers, macro context, analysis, or recommendations.</p>
+            </div>
+            <label class="model-picker">
+              <span>Model</span>
+              <select id="model-select">
+                <option value="">Server default</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="chat-log" class="chat-log">
+            <article class="message assistant">
+              <div class="bubble">
+                <p>Try "Tell me about CBA", "What is the macro picture?", or "Should I buy FMG?".</p>
+              </div>
+            </article>
+          </div>
+
+          <form id="chat-form" class="chat-form">
+            <input id="chat-input" autocomplete="off" placeholder="Type an ASX question..." aria-label="Chat message">
+            <button type="submit">Send</button>
+          </form>
+        </section>
+
+        <div id="drag-handle" class="drag-handle" role="separator" aria-label="Resize panels"></div>
+
+        <section class="dashboard-pane" aria-label="Dashboard">
+          <div class="dashboard-header">
+            <h2>Dashboard</h2>
+            <p id="dashboard-subtitle">Structured results render here after each answer.</p>
+          </div>
+          <div id="dashboard" class="dashboard empty">
+            <div class="empty-state">No dashboard data yet.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+[project]
+name = "quantbot-asx-mcp"
+version = "0.1.0"
+description = "MCP server for ASX stock technical, macro, analysis, and recommendation tools."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]",
+    "yfinance",
+    "pandas",
+    "pandas-ta; python_version < '3.14'",
+    "pydantic>=2",
+    "requests",
+    "httpx",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+quantbot-mcp = "mcp_server.server:main"
+
+[tool.setuptools.packages.find]
+include = ["mcp_server*"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
