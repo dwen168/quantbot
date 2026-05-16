@@ -31,14 +31,14 @@ function macroAnchorMessage(data) {
 }
 
 function analysisMessage(data) {
-  const bullish = (data.bullish_signals || []).slice(0, 3).map((item) => `- ${item}`).join("\n");
-  const bearish = (data.bearish_signals || []).slice(0, 3).map((item) => `- ${item}`).join("\n");
+  const bullish = (data.bullish_signals || []).slice(0, 3).map((item) => `- ${item.factor}`).join("\n");
+  const bearish = (data.bearish_signals || []).slice(0, 3).map((item) => `- ${item.factor}`).join("\n");
   return `**${data.symbol} analysis**: combined score **${data.scores?.combined_score}** (${data.technical_assessment?.overall || "neutral"} technicals, ${data.macro_assessment?.overall || "neutral"} macro).\n\n**Bullish factors**\n${bullish || "- None detected"}\n\n**Negative drivers**\n${bearish || "- None detected"}`;
 }
 
 function recommendationMessage(data) {
-  const reasons = (data.key_reasons || []).slice(0, 4).map((item) => `- ${item}`).join("\n");
-  const risks = (data.key_risks || []).slice(0, 3).map((item) => `- ${item}`).join("\n");
+  const reasons = (data.key_reasons || []).slice(0, 4).map((item) => `- ${item.factor}`).join("\n");
+  const risks = (data.key_risks || []).slice(0, 3).map((item) => `- ${item.factor}`).join("\n");
   return `**${data.symbol}: ${data.action}** with **${data.confidence}%** confidence.\n\nRisk level: **${data.risk_level}**. Target: **${money(data.price_guidance?.target_price)}**. Stop: **${money(data.price_guidance?.stop_loss)}**.\n\n**Reasons**\n${reasons || "- Score-based decision"}\n\n**Risks**\n${risks || "- Market data may be incomplete"}`;
 }
 

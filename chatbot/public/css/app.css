@@ -1134,13 +1134,11 @@ body.light .factor-item {
   font-variant-numeric: tabular-nums;
 }
 
-/* Score Hero Card */
+/* ── Score Hero Card ─────────────────────────────────── */
 .score-hero-card {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 32px;
+  flex-direction: column;
+  gap: 0;
   padding: 28px 32px;
   border-radius: 16px;
   background: rgba(0, 0, 0, 0.25);
@@ -1148,114 +1146,142 @@ body.light .factor-item {
   position: relative;
   overflow: hidden;
 }
-
 .score-hero-card::before {
   content: "";
   position: absolute;
   inset: 0;
-  opacity: 0.04;
+  opacity: 0.06;
   pointer-events: none;
-  background: radial-gradient(circle at 30% 50%, var(--accent), transparent 70%);
+  background: radial-gradient(ellipse at 0% 50%, var(--accent), transparent 60%);
 }
+.score-hero-card.bullish { border-color: rgba(16, 185, 129, 0.3); }
+.score-hero-card.bullish::before { background: radial-gradient(ellipse at 0% 50%, #10b981, transparent 60%); }
+.score-hero-card.bearish { border-color: rgba(239, 68, 68, 0.3); }
+.score-hero-card.bearish::before { background: radial-gradient(ellipse at 0% 50%, #ef4444, transparent 60%); }
 
-.score-hero-card.bullish { border-color: rgba(16, 185, 129, 0.35); }
-.score-hero-card.bullish::before { background: radial-gradient(circle at 30% 50%, #10b981, transparent 70%); opacity: 0.08; }
-.score-hero-card.bearish { border-color: rgba(239, 68, 68, 0.35); }
-.score-hero-card.bearish::before { background: radial-gradient(circle at 30% 50%, #ef4444, transparent 70%); opacity: 0.08; }
-
-.score-hero-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 200px;
-}
-
-.score-hero-label {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0;
+/* Row 1 — Verdict / Score / Chips */
+.sh-top {
   display: flex;
   align-items: center;
-  gap: 6px;
-  position: relative;
-  cursor: default;
+  gap: 40px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
 }
 
-.score-hero-tooltip {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--text);
-  width: 280px;
-  z-index: 100;
-  text-transform: none;
-  letter-spacing: 0;
-  line-height: 1.5;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+.sh-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 6px;
 }
-.score-hero-label:hover .score-hero-tooltip { display: block; }
 
-.score-hero-number {
-  font-size: 60px;
+.sh-verdict-block { flex: 1; }
+.sh-verdict {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.sh-verdict.bullish { color: var(--good); }
+.sh-verdict.bearish { color: var(--danger); }
+.sh-verdict.neutral { color: var(--muted); }
+
+.sh-score-block { text-align: right; }
+.sh-score {
+  font-size: 52px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
-.score-hero-card.bullish .score-hero-number { color: var(--good); }
-.score-hero-card.bearish .score-hero-number { color: var(--danger); }
-.score-hero-card.neutral .score-hero-number { color: var(--muted); }
+.sh-score.bullish { color: var(--good); }
+.sh-score.bearish { color: var(--danger); }
+.sh-score.neutral { color: var(--muted); }
 
-.score-hero-verdict {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.score-hero-verdict.bullish { color: var(--good); }
-.score-hero-verdict.bearish { color: var(--danger); }
-.score-hero-verdict.neutral { color: var(--muted); }
-
-.score-hero-right {
-  flex: 1;
+.sh-chips {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  align-items: flex-end;
 }
-
-.score-hero-bar {
-  height: 10px;
+.sh-chip {
+  display: inline-block;
+  padding: 4px 12px;
   border-radius: 999px;
-  background: var(--line);
-  overflow: hidden;
-  display: flex;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
+.sh-chip.bullish { background: rgba(16,185,129,0.12); color: var(--good);   border: 1px solid rgba(16,185,129,0.25); }
+.sh-chip.bearish { background: rgba(239,68,68,0.12);  color: var(--danger); border: 1px solid rgba(239,68,68,0.25);  }
 
-.score-hero-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.6s ease;
-}
-.score-hero-bar-fill.bullish { background: linear-gradient(to right, #10b981, #34d399); }
-.score-hero-bar-fill.bearish { background: linear-gradient(to left, #ef4444, #f87171); }
-.score-hero-bar-fill.neutral { background: var(--muted); }
-
-.score-hero-signals {
+/* Row 2 — Formula bar */
+.sh-formula-bar {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  gap: 20px;
+  padding-top: 18px;
 }
-.score-hero-signal { font-size: 13px; font-weight: 600; }
-.score-hero-signal.bullish { color: var(--good); }
-.score-hero-signal.bearish { color: var(--danger); }
+.sh-formula-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sh-formula {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sh-f-cat {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.sh-f-raw {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.sh-f-weight {
+  font-size: 11px;
+  color: var(--muted);
+}
+.sh-f-contrib {
+  font-size: 14px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.sh-f-contrib.pos { background: rgba(16,185,129,0.12); color: var(--good); }
+.sh-f-contrib.neg { background: rgba(239,68,68,0.12);  color: var(--danger); }
+.sh-f-op {
+  font-size: 14px;
+  color: var(--muted);
+  opacity: 0.5;
+  margin: 0 2px;
+}
+.sh-f-total {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.sh-f-total.bullish { color: var(--good); }
+.sh-f-total.bearish { color: var(--danger); }
+.sh-f-total.neutral { color: var(--muted); }
+
 
 @media (max-width: 1024px) {
   .split-layout {
@@ -1271,11 +1297,12 @@ body.light .factor-item {
   .widget-group {
     grid-template-columns: 1fr !important;
   }
-  .score-hero-card {
-    flex-direction: column;
-    align-items: flex-start;
+  .sh-top {
+    flex-wrap: wrap;
+    gap: 20px;
   }
-  .score-hero-right {
-    width: 100%;
-  }
+  .sh-score { font-size: 36px; }
+  .sh-formula { flex-wrap: wrap; }
 }
+
+

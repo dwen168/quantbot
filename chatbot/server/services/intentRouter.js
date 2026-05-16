@@ -7,7 +7,9 @@ const EXCLUSIONS = new Set([
   "NEW", "WAY", "MAY", "SAY", "ASK", "SET", "PUT", "LET", "SEE", "ASX", "ETF",
   "CEO", "CFO", "IPO", "LLM", "API", "USD", "AUD", "RBA", "GDP", "CPI", "FED",
   "BPS", "ATR", "RSI", "EMA", "SMA", "ADX", "MACD", "HOLD", "BUY", "SELL",
-  "TELL", "WHAT", "WHEN", "WHY", "WHO", "FROM", "THAT", "THIS", "WITH", "INTO"
+  "TELL", "WHAT", "WHEN", "WHY", "WHO", "FROM", "THAT", "THIS", "WITH", "INTO",
+  "TRADE", "STOCK", "SHARE", "PRICE", "CHART", "SHOW", "GIVE", "VIEW", "CHECK",
+  "SHOULD", "COULD", "WOULD", "THINK", "ABOUT", "EVERY", "RECOM", "SCORE"
 ]);
 
 const INTENTS = {
@@ -22,7 +24,8 @@ const INTENTS = {
 function extractTicker(message) {
   // Match 2–5 uppercase letter sequences that look like ASX tickers
   const candidates = message.toUpperCase().match(/\b[A-Z]{2,5}\b/g) || [];
-  return candidates.find((c) => !EXCLUSIONS.has(c)) || null;
+  // Reverse search: typically tickers are at the end of a question/phrase
+  return candidates.reverse().find((c) => !EXCLUSIONS.has(c)) || null;
 }
 
 async function llmFallback(message) {

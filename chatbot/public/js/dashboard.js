@@ -390,7 +390,7 @@ function renderStockHero(widget) {
   card.innerHTML = `
     <div class="stock-hero-left">
       <div class="stock-hero-symbol">${widget.symbol || "—"}</div>
-      <div class="stock-hero-price">${widget.price != null ? widget.price : "n/a"}</div>
+      <div class="stock-hero-price">${widget.price != null ? '$' + widget.price : "n/a"}</div>
       <div class="stock-hero-price-label">Last Price (AUD)</div>
     </div>
     <div class="stock-hero-divider"></div>
@@ -498,38 +498,58 @@ function renderText(widget) {
 }
 
 function renderScoreHero(widget) {
-  const score = widget.combinedScore;
-  let verdict = "NEUTRAL";
-  let sentiment = "neutral";
-  if (score >= 40) { verdict = "BULLISH"; sentiment = "bullish"; }
-  else if (score >= 15) { verdict = "MILDLY BULLISH"; sentiment = "bullish"; }
-  else if (score <= -40) { verdict = "BEARISH"; sentiment = "bearish"; }
-  else if (score <= -15) { verdict = "MILDLY BEARISH"; sentiment = "bearish"; }
+  const score  = widget.combinedScore ?? 0;
+  const techScore  = widget.techScore  ?? 0;
+  const macroScore = widget.macroScore ?? 0;
+
+  let verdict = "NEUTRAL", sentiment = "neutral";
+  if      (score >=  40) { verdict = "STRONG BULLISH"; sentiment = "bullish"; }
+  else if (score >=  15) { verdict = "BULLISH";        sentiment = "bullish"; }
+  else if (score <= -40) { verdict = "STRONG BEARISH"; sentiment = "bearish"; }
+  else if (score <= -15) { verdict = "BEARISH";        sentiment = "bearish"; }
 
   const card = el("section", `widget full-width score-hero-card ${sentiment}`);
 
-  const left = el("div", "score-hero-left");
-  const label = el("p", "score-hero-label", "Combined Score");
-  const tooltip = el("span", "score-hero-tooltip", "Weighted combination: Technical (60%) + Macro (40%). Range: -100 to +100.");
-  label.append(tooltip);
-  const scoreNum = el("div", "score-hero-number", score !== null ? (score > 0 ? `+${score}` : String(score)) : "n/a");
-  const verdictEl = el("div", `score-hero-verdict ${sentiment}`, verdict);
-  left.append(label, scoreNum, verdictEl);
+  const scoreStr     = score     > 0 ? `+${score}`     : String(score);
+  const techStr      = techScore  > 0 ? `+${techScore}`  : String(techScore);
+  const macroStr     = macroScore > 0 ? `+${macroScore}` : String(macroScore);
+  const techContrib  = Math.round(techScore  * 0.6);
+  const macroContrib = Math.round(macroScore * 0.4);
+  const tcStr = techContrib  > 0 ? `+${techContrib}`  : String(techContrib);
+  const mcStr = macroContrib > 0 ? `+${macroContrib}` : String(macroContrib);
 
-  const right = el("div", "score-hero-right");
-  const bar = el("div", "score-hero-bar");
-  const fill = el("div", `score-hero-bar-fill ${sentiment}`);
-  fill.style.width = `${Math.min(100, Math.max(0, Math.abs(score ?? 0)))}%`;
-  if (score < 0) fill.style.marginLeft = "auto";
-  bar.append(fill);
-
-  const signals = el("div", "score-hero-signals");
-  const bull = el("span", "score-hero-signal bullish", `▲ ${widget.bullishCount ?? 0} Bullish signals`);
-  const bear = el("span", "score-hero-signal bearish", `▼ ${widget.bearishCount ?? 0} Bearish signals`);
-  signals.append(bull, bear);
-  right.append(bar, signals);
-
-  card.append(left, right);
+  card.innerHTML = `
+    <div class="sh-top">
+      <div class="sh-verdict-block">
+        <span class="sh-eyebrow">Research Verdict</span>
+        <span class="sh-verdict ${sentiment}">${verdict}</span>
+      </div>
+      <div class="sh-score-block">
+        <span class="sh-eyebrow">Combined Score</span>
+        <span class="sh-score ${sentiment}">${scoreStr}</span>
+      </div>
+      <div class="sh-chips">
+        <span class="sh-chip bullish">&#9650; ${widget.bullishCount ?? 0} bullish</span>
+        <span class="sh-chip bearish">&#9660; ${widget.bearishCount ?? 0} bearish</span>
+      </div>
+    </div>
+    <div class="sh-formula-bar">
+      <span class="sh-formula-label">Score breakdown</span>
+      <div class="sh-formula">
+        <span class="sh-f-cat">Technical</span>
+        <span class="sh-f-raw">${techStr}</span>
+        <span class="sh-f-weight">\xd7 60%</span>
+        <span class="sh-f-contrib ${techContrib >= 0 ? 'pos' : 'neg'}">${tcStr}</span>
+        <span class="sh-f-op">+</span>
+        <span class="sh-f-cat">Macro</span>
+        <span class="sh-f-raw">${macroStr}</span>
+        <span class="sh-f-weight">\xd7 40%</span>
+        <span class="sh-f-contrib ${macroContrib >= 0 ? 'pos' : 'neg'}">${mcStr}</span>
+        <span class="sh-f-op">=</span>
+        <span class="sh-f-total ${sentiment}">${scoreStr}</span>
+      </div>
+    </div>
+  `;
   return card;
 }
 
@@ -920,4 +940,3 @@ export function highlightDashboardSession(sessionId) {
     target.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
-

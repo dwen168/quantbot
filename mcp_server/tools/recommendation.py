@@ -32,13 +32,15 @@ def recommend_stock(ticker: str) -> Recommendation:
     score = analysis.scores.combined_score
     action, confidence = _decision(score)
 
-    # Derive current price from key levels (stop_loss_suggestion = current * 0.92)
+    # Use last_price directly from analysis
+    current = analysis.last_price
     raw_stop = analysis.technical_assessment.key_levels.stop_loss_suggestion
     support = analysis.technical_assessment.key_levels.support
     resistance = analysis.technical_assessment.key_levels.resistance
 
-    # Reconstruct current price: stop is pre-set as current*0.92
-    current = round(raw_stop / 0.92, 4) if raw_stop else None
+    with open("recommendation_debug.log", "a") as f:
+        f.write(f"DEBUG: ticker={ticker} current={current} raw_stop={raw_stop}\n")
+        f.write(f"DEBUG: analysis_dict={analysis.model_dump()}\n")
 
     # Stop loss: use the pre-calculated suggestion (8% below current)
     stop = raw_stop

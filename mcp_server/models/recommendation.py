@@ -37,12 +37,14 @@ class MacroAssessment(BaseModel):
 class SignalFactor(BaseModel):
     factor: str
     score: int
+    category: str | None = None
 
 class StockAnalysis(BaseModel):
     symbol: str
     company_name: str
     sector: str | None = None
     analysis_date: str
+    last_price: float | None = None
     scores: AnalysisScores
     technical_assessment: TechnicalAssessment
     macro_assessment: MacroAssessment

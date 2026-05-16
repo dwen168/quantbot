@@ -70,6 +70,7 @@ def analyze_stock(ticker: str) -> StockAnalysis:
         company_name=info.get("longName") or info.get("shortName") or symbol,
         sector=info.get("sector"),
         analysis_date=date.today().isoformat(),
+        last_price=technical.last_price,
         scores=AnalysisScores(
             technical_score=scored.technical_score,
             macro_score=scored.macro_score,

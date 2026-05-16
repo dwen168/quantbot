@@ -1,5 +1,5 @@
-function fmt(value, suffix = "") {
-  return value === null || value === undefined ? "n/a" : `${value}${suffix}`;
+function fmt(value, suffix = "", prefix = "") {
+  return value === null || value === undefined ? "n/a" : `${prefix}${value}${suffix}`;
 }
 
 function kv(id, title, rows, options = {}) {
@@ -64,24 +64,24 @@ function buildStockCharts(data) {
         columns: 3,
         widgets: [
           kv("momentum", "Momentum", [
-            ["RSI 14",       fmt(data.momentum?.rsi_14)],
-            ["MACD",         fmt(data.momentum?.macd)],
-            ["MACD Signal",  fmt(data.momentum?.macd_signal)],
-            ["MACD Hist",    fmt(data.momentum?.macd_histogram)],
-            ["Stoch K",      fmt(data.momentum?.stoch_k)],
-            ["Stoch D",      fmt(data.momentum?.stoch_d)],
+            ["RSI 14", fmt(data.momentum?.rsi_14)],
+            ["MACD", fmt(data.momentum?.macd)],
+            ["MACD Signal", fmt(data.momentum?.macd_signal)],
+            ["MACD Hist", fmt(data.momentum?.macd_histogram)],
+            ["Stoch K", fmt(data.momentum?.stoch_k)],
+            ["Stoch D", fmt(data.momentum?.stoch_d)],
           ], { description: "Price momentum indicators. RSI > 70 = overbought, < 30 = oversold. MACD above signal line is bullish." }),
           kv("trend-vol", "Trend & Volatility", [
-            ["Trend",        data.trend?.trend_signal || "n/a"],
-            ["ADX 14",       fmt(data.trend?.adx_14)],
-            ["ATR 14",       fmt(data.volatility?.atr_14)],
+            ["Trend", data.trend?.trend_signal || "n/a"],
+            ["ADX 14", fmt(data.trend?.adx_14)],
+            ["ATR 14", fmt(data.volatility?.atr_14)],
             ["Volume Ratio", fmt(data.volume?.volume_ratio)],
           ], { description: "ADX > 25 = strong trend. ATR measures average daily price range. Volume Ratio > 1 = above-average activity." }),
           kv("bollinger", "Bollinger Bands", [
-            ["Upper",        fmt(data.volatility?.bb_upper)],
-            ["Middle",       fmt(data.volatility?.bb_middle)],
-            ["Lower",        fmt(data.volatility?.bb_lower)],
-            ["Width",        fmt(data.volatility?.bb_width)],
+            ["Upper", fmt(data.volatility?.bb_upper)],
+            ["Middle", fmt(data.volatility?.bb_middle)],
+            ["Lower", fmt(data.volatility?.bb_lower)],
+            ["Width", fmt(data.volatility?.bb_width)],
           ], { description: "Price near Upper Band = overbought risk. Near Lower Band = oversold opportunity. Width = current volatility." }),
         ]
       },
@@ -93,11 +93,11 @@ function buildStockCharts(data) {
         title: "Moving Averages vs Current Price",
         description: `Current price: ${fmt(price)}. Green = price is above the MA (bullish alignment). Red = price is below (bearish).`,
         rows: [
-          { label: "SMA 20",  value: fmt(ma.sma_20),  diff: maDiff(ma.sma_20),  period: "20-day" },
-          { label: "SMA 50",  value: fmt(ma.sma_50),  diff: maDiff(ma.sma_50),  period: "50-day" },
+          { label: "SMA 20", value: fmt(ma.sma_20), diff: maDiff(ma.sma_20), period: "20-day" },
+          { label: "SMA 50", value: fmt(ma.sma_50), diff: maDiff(ma.sma_50), period: "50-day" },
           { label: "SMA 200", value: fmt(ma.sma_200), diff: maDiff(ma.sma_200), period: "200-day" },
-          { label: "EMA 20",  value: fmt(ma.ema_20),  diff: maDiff(ma.ema_20),  period: "20-day EMA" },
-          { label: "EMA 50",  value: fmt(ma.ema_50),  diff: maDiff(ma.ema_50),  period: "50-day EMA" },
+          { label: "EMA 20", value: fmt(ma.ema_20), diff: maDiff(ma.ema_20), period: "20-day EMA" },
+          { label: "EMA 50", value: fmt(ma.ema_50), diff: maDiff(ma.ema_50), period: "50-day EMA" },
         ]
       },
 
@@ -233,50 +233,68 @@ function buildMacroAnchorCharts(data) {
 
 function buildAnalysisCharts(data) {
   const combinedScore = data.scores?.combined_score ?? null;
-  const techScore = data.scores?.technical_score ?? null;
-  const macroScore = data.scores?.macro_score ?? null;
+  const techScore     = data.scores?.technical_score  ?? null;
+  const macroScore    = data.scores?.macro_score       ?? null;
+
+  // Split signals by category so they perfectly explain the math
+  const allBullish = data.bullish_signals || [];
+  const allBearish = data.bearish_signals || [];
+  const allRisks   = data.risk_factors || [];
+
+  const techBullish = allBullish.filter(s => s.category === "technical");
+  const techBearish = allBearish.filter(s => s.category === "technical");
+  
+  const macroBullish = allBullish.filter(s => s.category === "macro");
+  const macroRisks   = allRisks.filter(s => s.category === "macro");
 
   return {
     widgets: [
-      { id: "analysis-banner", type: "banner", text: "Research View" },
+      { id: "analysis-banner", type: "banner", text: "🔬 Deep Analysis" },
 
-      // Top-level: Combined Score hero — the single verdict
+      // 1. Score Hero — verdict, score, formula
       {
         id: "combined-score-hero",
         type: "score-hero",
         combinedScore,
-        bullishCount: data.scores?.signal_count_bullish,
-        bearishCount: data.scores?.signal_count_bearish,
+        techScore,
+        macroScore,
+        techBullCount: techBullish.length,
+        techBearCount: techBearish.length,
+        macroBullCount: macroBullish.length,
+        macroRiskCount: macroRisks.length
       },
 
-      // Second row: Technical and Macro as equal sub-components (2-col)
+      // 2. Technical + Macro side by side
       {
         id: "sub-scores-group",
         type: "group",
         columns: 2,
         widgets: [
-          kv("technical-assessment", "Technical Score · " + (techScore !== null ? techScore : "n/a"), [
-            ["Overall", data.technical_assessment?.overall],
-            ["Trend", data.technical_assessment?.trend_signal],
-            ["Momentum", data.technical_assessment?.momentum_signal],
-            ["Support", fmt(data.technical_assessment?.key_levels?.support)],
-            ["Resistance", fmt(data.technical_assessment?.key_levels?.resistance)],
-            ["Stop Loss", fmt(data.technical_assessment?.key_levels?.stop_loss_suggestion)]
-          ], { description: "Contributes 60% to Combined Score. Evaluates momentum, trend strength, moving average alignment, volatility, and volume." }),
-          kv("macro-assessment", "Macro Score · " + (macroScore !== null ? macroScore : "n/a"), [
-            ["Overall", data.macro_assessment?.overall],
-            ["Rates Headwind", data.macro_assessment?.rates_headwind ? "Yes" : "No"],
-            ["China Tailwind", data.macro_assessment?.china_tailwind ? "Yes" : "No"],
-            ["Risk Sentiment", data.macro_assessment?.risk_sentiment]
-          ], { description: "Contributes 40% to Combined Score. Evaluates RBA rate regime, global risk sentiment, and China macro linkage." })
+          kv("technical-assessment", `Technical Assessment`, [
+            ["Verdict",    data.technical_assessment?.overall],
+            ["Trend",      data.technical_assessment?.trend_signal],
+            ["Momentum",   data.technical_assessment?.momentum_signal],
+            ["Volatility", data.technical_assessment?.volatility_signal],
+            ["Volume",     data.technical_assessment?.volume_signal],
+            ["Support",    fmt(data.technical_assessment?.key_levels?.support,               "", "$")],
+            ["Resistance", fmt(data.technical_assessment?.key_levels?.resistance,            "", "$")],
+            ["Stop Loss",  fmt(data.technical_assessment?.key_levels?.stop_loss_suggestion,  "", "$")],
+          ], { description: "Technical score (60% weight) — evaluates price trend, momentum, moving average alignment, volatility and volume." }),
+          kv("macro-assessment", `Macro Assessment`, [
+            ["Verdict",        data.macro_assessment?.overall],
+            ["Risk Sentiment", data.macro_assessment?.risk_sentiment],
+            ["Rates Headwind", data.macro_assessment?.rates_headwind ? "Yes ⚠️" : "No ✅"],
+            ["China Tailwind", data.macro_assessment?.china_tailwind ? "Yes ✅" : "No"],
+          ], { description: "Macro score (40% weight) — evaluates RBA rates regime, VIX risk environment, and China macro linkage." }),
         ]
       },
 
-      // Signal detail cards
-      factors("bullish-signals", "✅ Bullish Signals", data.bullish_signals),
-      factors("bearish-signals", "⚠️ Negative Drivers", data.bearish_signals),
-      factors("risk-factors", "🔴 Risk Factors", data.risk_factors),
-      data.narrative ? { id: "analysis-summary", type: "text", title: "Analysis Summary", text: data.narrative } : null
+      // 4. Signals grouped by category to match the formula!
+      factors("technical-signals", "📊 Technical Drivers", [...techBullish, ...techBearish]),
+      factors("macro-signals",     "🌍 Macro Factors",    [...macroBullish, ...macroRisks]),
+
+      // 5. Narrative
+      data.narrative ? { id: "analysis-summary", type: "text", title: "Analyst Narrative", text: data.narrative } : null,
     ].filter(Boolean),
     charts: []
   };
@@ -287,11 +305,11 @@ function buildRecommendationCharts(data) {
   const scores = data.underlying_analysis?.scores || {};
   const upside = pg.upside_pct;
   const downside = pg.downside_risk_pct;
-  const rr = (upside && downside && downside !== 0) ? (upside / downside).toFixed(2) : null;
+  const rr = (upside !== null && downside !== null && downside !== 0) ? (upside / downside).toFixed(2) : null;
 
   const entryLabel = data.action === "BUY" ? "Buy Zone" : data.action === "SELL" ? "Sell Zone" : "Fair Value Zone";
   const entryRange = (pg.entry_range_low && pg.entry_range_high)
-    ? `${fmt(pg.entry_range_low)} – ${fmt(pg.entry_range_high)}`
+    ? `${fmt(pg.entry_range_low, "", "$")} – ${fmt(pg.entry_range_high, "", "$")}`
     : "n/a";
 
   return {
@@ -344,10 +362,10 @@ function buildRecommendationCharts(data) {
             title: "Trade Price Levels",
             description: "Prices are derived from 52-week high/low range and an 8% ATR-based stop loss rule.",
             rows: [
-              { label: "Current Price", value: fmt(pg.current_price), note: "Estimated by reversing: Stop Loss ÷ 0.92 (since stop = current × 0.92)." },
+              { label: "Current Price", value: fmt(pg.current_price, "", "$"), note: "Estimated by reversing: Stop Loss ÷ 0.92 (since stop = current × 0.92)." },
               { label: entryLabel, value: entryRange, note: data.action === "BUY" ? "−2% to +0.5% of current price: patient entry on a slight pullback." : data.action === "SELL" ? "−0.5% to +2%: sell into a bounce for a better average price." : "±1% around current price — no directional edge detected." },
-              { label: "Stop Loss", value: fmt(pg.stop_loss), note: "Set at 8% below current price. Exit immediately if this level is breached to cap losses." },
-              { label: "Target Price", value: fmt(pg.target_price), note: data.action === "BUY" ? "52-week resistance level, or +15% if no resistance is available." : data.action === "SELL" ? "52-week support, or −12% if no support data." : "No directional target — hold at current levels." },
+              { label: "Stop Loss", value: fmt(pg.stop_loss, "", "$"), note: "Set at 8% below current price. Exit immediately if this level is breached to cap losses." },
+              { label: "Target Price", value: fmt(pg.target_price, "", "$"), note: data.action === "BUY" ? "52-week resistance level, or +15% if no resistance is available." : data.action === "SELL" ? "52-week support, or −12% if no support data." : "No directional target — hold at current levels." },
             ]
           },
           {
