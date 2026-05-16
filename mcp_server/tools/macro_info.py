@@ -53,6 +53,24 @@ def _pct_change(ticker: str, period: str = "1mo", days: int | None = None) -> fl
     except Exception:
         return None
 
+def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
+    try:
+        df = get_ohlcv(ticker, period)
+        if df.empty:
+            return None
+        series = []
+        for index, row in df.iterrows():
+            series.append({
+                "time": index.strftime("%Y-%m-%d"),
+                "open": _clean(row["Open"]),
+                "high": _clean(row["High"]),
+                "low": _clean(row["Low"]),
+                "close": _clean(row["Close"])
+            })
+        return series
+    except Exception:
+        return None
+
 
 def _news_items() -> list[NewsItem]:
     items: list[NewsItem] = []
@@ -101,6 +119,8 @@ def get_macro_info() -> MacroInfo:
             aud_usd=_last_close("AUDUSD=X"),
             aud_cny=_last_close("AUDCNY=X"),
             aud_usd_1mo_change=_pct_change("AUDUSD=X", "1mo"),
+            aud_usd_series=_history("AUDUSD=X"),
+            aud_cny_series=_history("AUDCNY=X"),
         ),
         commodities=Commodities(
             iron_ore_etf_proxy=_last_close("QRE.AX"),
@@ -108,6 +128,9 @@ def get_macro_info() -> MacroInfo:
             crude_oil_usd=_last_close("CL=F"),
             copper_usd=_last_close("HG=F"),
             coal_proxy_ticker=_last_close("WHC.AX"),
+            gold_usd_series=_history("GC=F"),
+            crude_oil_usd_series=_history("CL=F"),
+            copper_usd_series=_history("HG=F"),
         ),
         global_indices=GlobalIndices(
             sp500_1d_change=_pct_change("^GSPC", "5d", days=2),

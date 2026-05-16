@@ -102,6 +102,38 @@ def get_macro_anchors() -> MacroAnchors:
     if not any((cpi, gdp, unemployment)):
         data_note = "ABS CPI, GDP, and unemployment fields are best-effort and currently unavailable."
 
+    # Fetch 3-month series for sector trend chart
+    trend_labels = []
+    trend_datasets = []
+    try:
+        colors = {
+            "Broad Market": "#64748b",
+            "Resources": "#f59e0b",
+            "Financials": "#3b82f6",
+            "Technology": "#10b981",
+        }
+        for code, name in SECTOR_PROXIES.items():
+            if name == "Property":
+                continue  # Skip to avoid too many lines
+            df = get_ohlcv(code, "3mo")
+            if not df.empty:
+                df = df.dropna(subset=["Close"])
+                if not df.empty:
+                    base_price = df["Close"].iloc[0]
+                    normalized = (df["Close"] / base_price * 100).round(2)
+                    if not trend_labels:
+                        trend_labels = [d.strftime("%Y-%m-%d") for d in df.index]
+                    trend_datasets.append({
+                        "label": name,
+                        "data": normalized.tolist(),
+                        "borderColor": colors.get(name, "#999999"),
+                        "borderWidth": 2,
+                        "pointRadius": 0,
+                        "tension": 0.3
+                    })
+    except Exception as e:
+        errors.append(f"Failed to fetch sector trend data: {e}")
+
     return MacroAnchors(
         as_of_date=date.today().isoformat(),
         rates_environment=RatesEnv(
@@ -135,6 +167,8 @@ def get_macro_anchors() -> MacroAnchors:
             outperforming_sectors=outperformers,
             underperforming_sectors=underperformers,
             rotation_signal=rotation,
+            trend_labels=trend_labels,
+            trend_datasets=trend_datasets,
         ),
         summary=summary,
         data_note=data_note,

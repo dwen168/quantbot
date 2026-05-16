@@ -52,8 +52,11 @@
 
         <section class="dashboard-pane" aria-label="Dashboard">
           <div class="dashboard-header">
-            <h2>Dashboard</h2>
-            <p id="dashboard-subtitle">Structured results render here after each answer.</p>
+            <div>
+              <h2>Dashboard</h2>
+              <p id="dashboard-subtitle">Results accumulate here. Click a chat message to jump to its panel.</p>
+            </div>
+            <button id="clear-dashboard-btn" class="icon-button" type="button" title="Clear all dashboard panels">✕ Clear</button>
           </div>
           <div id="dashboard" class="dashboard empty">
             <div class="empty-state">No dashboard data yet.</div>

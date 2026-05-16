@@ -1,27 +1,61 @@
-import { render as renderDashboard } from "./dashboard.js";
+import { render as renderDashboard, highlightDashboardSession, clearDashboard } from "./dashboard.js";
 
 const history = [];
+let sessionIdCounter = 0;
 
-function appendMessage(role, html, tool) {
+// Friendly human-readable labels for MCP tool names
+const TOOL_LABELS = {
+  get_technical_indicators: "📊 Technical Analysis",
+  analyze_stock:            "🔬 Deep Analysis",
+  recommend_stock:          "⭐ Trade Recommendation",
+  get_macro_anchors:        "🌐 Market Anchors",
+  get_macro_info:           "📰 Macro Conditions",
+};
+
+function friendlyTool(tool) {
+  return TOOL_LABELS[tool] || tool?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || null;
+}
+
+function appendMessage(role, html, tool, sessionId) {
   const log = document.getElementById("chat-log");
   const article = document.createElement("article");
   article.className = `message ${role}`;
+  if (sessionId !== undefined) {
+    article.dataset.sessionId = sessionId;
+  }
+
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  if (tool) {
-    const badge = document.createElement("span");
-    badge.className = "tool-badge";
-    badge.textContent = tool;
-    bubble.append(badge);
+
+  // Tool chip — shown only for assistant messages with a tool
+  if (tool && role === "assistant") {
+    const chip = document.createElement("div");
+    chip.className = "tool-chip";
+    chip.textContent = friendlyTool(tool);
+    bubble.append(chip);
   }
+
   const body = document.createElement("div");
   body.innerHTML = html;
   bubble.append(body);
+
+  // "View Panel" button if linked to a dashboard session
+  if (sessionId !== undefined) {
+    const link = document.createElement("button");
+    link.className = "dashboard-link-btn";
+    link.title = "Jump to dashboard panel";
+    link.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> View Panel`;
+    link.addEventListener("click", (e) => {
+      e.stopPropagation();
+      highlightDashboardSession(sessionId);
+    });
+    bubble.append(link);
+  }
+
   article.append(bubble);
   log.append(article);
   requestAnimationFrame(() => {
-    log.scrollTop = log.scrollHeight;
-    article.scrollIntoView({ block: "end", behavior: "auto" });
+    article.scrollIntoView({ block: "end", behavior: "smooth" });
   });
   return article;
 }
@@ -49,11 +83,22 @@ async function loadModels() {
   }
 }
 
+
 export function initChat() {
   loadModels();
   const form = document.getElementById("chat-form");
   const input = document.getElementById("chat-input");
   const modelSelect = document.getElementById("model-select");
+
+  // Clear dashboard button
+  const clearBtn = document.getElementById("clear-dashboard-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      clearDashboard();
+      // Remove all dashboard link buttons from chat
+      document.querySelectorAll(".dashboard-link-btn").forEach(el => el.remove());
+    });
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -80,13 +125,22 @@ export function initChat() {
         appendMessage("assistant", markdown(`**Error:** ${data.error || "Request failed."}`));
         return;
       }
-      appendMessage("assistant", markdown(data.message), data.tool);
+
+      // Only assign a session if there is real dashboard content
+      const hasDashboard = (data.charts?.length > 0) || (data.widgets?.length > 0);
+      const sessionId = hasDashboard ? (++sessionIdCounter) : undefined;
+
+      appendMessage("assistant", markdown(data.message), data.tool, sessionId);
       history.push({ role: "assistant", content: data.message });
       while (history.length > 20) history.shift();
-      renderDashboard(data);
+
+      if (hasDashboard) {
+        renderDashboard(data, sessionId);
+      }
     } catch (error) {
       typing.remove();
       appendMessage("assistant", markdown(`**Error:** ${error.message}`));
     }
   });
 }
+

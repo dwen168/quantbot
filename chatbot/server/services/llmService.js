@@ -25,10 +25,10 @@ export async function listModels() {
 }
 
 export async function preferredModel(requestedModel) {
-  if (requestedModel) {
+  const models = await listModels();
+  if (requestedModel && models.includes(requestedModel)) {
     return requestedModel;
   }
-  const models = await listModels();
   if (models.includes("gemma4:e4b")) {
     return "gemma4:e4b";
   }
@@ -37,24 +37,40 @@ export async function preferredModel(requestedModel) {
 
 export async function generateChatSummary({ prompt, model }) {
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-  try {
-    const data = await fetchJson(`${baseUrl}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      timeout: 9000,
-      body: JSON.stringify({
-        model: await preferredModel(model),
-        stream: false,
-        messages: [
-          { role: "system", content: "Write concise, practical ASX market chatbot responses in markdown." },
-          { role: "user", content: prompt }
-        ]
-      })
-    });
-    return data.message?.content || null;
-  } catch {
-    return null;
+  const targetModel = await preferredModel(model);
+  const models = await listModels();
+
+  // Put target model first, then the rest
+  const modelsToTry = [targetModel, ...models.filter(m => m !== targetModel)];
+
+  for (const currentModel of modelsToTry) {
+    if (!currentModel) continue;
+    try {
+      const response = await fetch(`${baseUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        timeout: 9000,
+        body: JSON.stringify({
+          model: currentModel,
+          stream: false,
+          messages: [
+            { role: "system", content: "Write concise, practical ASX market chatbot responses in markdown." },
+            { role: "user", content: prompt }
+          ]
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.message?.content) {
+          return data.message.content;
+        }
+      }
+    } catch (e) {
+      // Continue to next model on network errors or timeouts
+      continue;
+    }
   }
+  return null;
 }
 
 export function hasOllamaCli() {

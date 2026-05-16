@@ -69,6 +69,33 @@ router.post("/", async (req, res) => {
   const routed = await routeIntent(message);
   const tool = toolForIntent(routed.intent);
   if (!tool) {
+    let fallbackMessage = null;
+    try {
+      if (process.env.OPENAI_API_KEY) {
+        const { default: OpenAI } = await import("openai");
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const completion = await client.chat.completions.create({
+          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are QuantBot, an AI assistant for Australian market analysis. The user asked a general question. Answer it helpfully and concisely in markdown." },
+            { role: "user", content: message }
+          ]
+        });
+        fallbackMessage = completion.choices[0]?.message?.content;
+      } else {
+        fallbackMessage = await generateChatSummary({
+          model,
+          prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
+        });
+      }
+    } catch (e) {
+      console.error("Fallback LLM failed:", e);
+    }
+    
+    if (fallbackMessage) {
+      return res.json({ message: fallbackMessage, tool: null, params: {}, rawData: null, charts: [], widgets: [] });
+    }
+
     return res.status(400).json({
       error: "Could not resolve ticker or intent from your message. Try an ASX ticker such as BHP, CBA, RIO, or ask about macro conditions.",
       code: "INTENT_NOT_FOUND"

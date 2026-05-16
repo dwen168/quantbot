@@ -34,6 +34,10 @@ class MacroAssessment(BaseModel):
     risk_sentiment: str
 
 
+class SignalFactor(BaseModel):
+    factor: str
+    score: int
+
 class StockAnalysis(BaseModel):
     symbol: str
     company_name: str
@@ -42,9 +46,9 @@ class StockAnalysis(BaseModel):
     scores: AnalysisScores
     technical_assessment: TechnicalAssessment
     macro_assessment: MacroAssessment
-    bullish_signals: list[str] = Field(default_factory=list)
-    bearish_signals: list[str] = Field(default_factory=list)
-    risk_factors: list[str] = Field(default_factory=list)
+    bullish_signals: list[SignalFactor] = Field(default_factory=list)
+    bearish_signals: list[SignalFactor] = Field(default_factory=list)
+    risk_factors: list[SignalFactor] = Field(default_factory=list)
     narrative: str | None = None
 
 
@@ -67,7 +71,7 @@ class Recommendation(BaseModel):
     time_horizon: str
     risk_level: str
     price_guidance: PriceGuidance
-    key_reasons: list[str] = Field(default_factory=list)
-    key_risks: list[str] = Field(default_factory=list)
+    key_reasons: list[SignalFactor] = Field(default_factory=list)
+    key_risks: list[SignalFactor] = Field(default_factory=list)
     underlying_analysis: StockAnalysis
     narrative: str | None = None

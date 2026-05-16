@@ -29,6 +29,8 @@ class Currencies(BaseModel):
     aud_usd: float | None = None
     aud_cny: float | None = None
     aud_usd_1mo_change: float | None = None
+    aud_usd_series: list[dict] | None = None
+    aud_cny_series: list[dict] | None = None
 
 
 class Commodities(BaseModel):
@@ -37,6 +39,9 @@ class Commodities(BaseModel):
     crude_oil_usd: float | None = None
     copper_usd: float | None = None
     coal_proxy_ticker: float | None = None
+    gold_usd_series: list[dict] | None = None
+    crude_oil_usd_series: list[dict] | None = None
+    copper_usd_series: list[dict] | None = None
 
 
 class GlobalIndices(BaseModel):
@@ -102,6 +107,8 @@ class SectorRotation(BaseModel):
     outperforming_sectors: list[str] = Field(default_factory=list)
     underperforming_sectors: list[str] = Field(default_factory=list)
     rotation_signal: str = "MIXED"
+    trend_labels: list[str] = Field(default_factory=list)
+    trend_datasets: list[dict] = Field(default_factory=list)
 
 
 class MacroAnchors(BaseModel):

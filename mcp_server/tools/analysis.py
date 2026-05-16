@@ -98,7 +98,7 @@ def analyze_stock(ticker: str) -> StockAnalysis:
     )
     prompt = (
         f"Summarise {analysis.symbol} in 4 sentences. Combined score {analysis.scores.combined_score}. "
-        f"Bullish: {analysis.bullish_signals}. Bearish: {analysis.bearish_signals}. Risks: {analysis.risk_factors}."
+        f"Bullish: {[s.factor for s in analysis.bullish_signals]}. Bearish: {[s.factor for s in analysis.bearish_signals]}. Risks: {[s.factor for s in analysis.risk_factors]}."
     )
     analysis.narrative = generate_narrative(prompt)
     return analysis
