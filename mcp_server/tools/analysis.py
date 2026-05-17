@@ -24,16 +24,23 @@ def _overall(score: int, positive: str, negative: str, neutral: str) -> str:
     return neutral
 
 
-def _key_levels(prices: list[float], current: float | None) -> KeyLevels:
+def _key_levels(prices: list[float], current: float | None, atr: float | None = None) -> KeyLevels:
     if not prices or current is None:
         return KeyLevels()
     recent = prices[-60:]
     support = min(recent) if recent else None
     resistance = max(recent) if recent else None
+    
+    # ATR-based dynamic stop loss (2x ATR) or fallback to 8%
+    if atr:
+        stop_loss = round(current - (2.0 * atr), 4)
+    else:
+        stop_loss = round(current * 0.92, 4)
+        
     return KeyLevels(
         support=round(support, 4) if support else None,
         resistance=round(resistance, 4) if resistance else None,
-        stop_loss_suggestion=round(current * 0.92, 4),
+        stop_loss_suggestion=stop_loss,
     )
 
 
@@ -41,8 +48,9 @@ def analyze_stock(ticker: str) -> StockAnalysis:
     symbol = normalize_asx_ticker(ticker)
     technical = get_technical_indicators(ticker, "2y")
     regime = get_macro_regime()
-    scored = score_stock(technical, regime)
     info = get_info(symbol)
+    sector = info.get("sector")
+    scored = score_stock(technical, regime, sector=sector)
     closes = [candle.close for candle in technical.price_series if candle.close is not None]
 
     momentum_signal = "NEUTRAL"
@@ -82,7 +90,7 @@ def analyze_stock(ticker: str) -> StockAnalysis:
             momentum_signal=momentum_signal,
             volatility_signal=volatility_signal,
             volume_signal=volume_signal,
-            key_levels=_key_levels(closes, technical.last_price),
+            key_levels=_key_levels(closes, technical.last_price, technical.volatility.atr_14),
         ),
         macro_assessment=MacroAssessment(
             overall=macro_overall,

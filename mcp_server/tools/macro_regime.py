@@ -149,6 +149,8 @@ def get_macro_regime() -> MacroRegime:
             trend_labels=trend_labels,
             trend_datasets=trend_datasets,
         ),
+        commodities=core.commodities,
+        global_indices_1d=core.global_indices_1d,
         summary=summary,
         errors=errors,
     )

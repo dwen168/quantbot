@@ -214,7 +214,7 @@ function renderTable(widget) {
 }
 
 function renderNews(widget) {
-  const card = el("section", "widget full-width news-widget");
+  const card = el("section", `widget ${widget.fullWidth ? "full-width" : ""} news-widget`);
   card.append(el("h3", null, widget.title));
   
   const grid = el("div", "news-grid");
@@ -229,12 +229,18 @@ function renderNews(widget) {
     
     const title = el("div", "news-title", item.title);
     const meta = el("div", "news-meta");
-    if (item.publisher || item.related_ticker) {
-      meta.textContent = item.publisher || item.related_ticker;
+
+    if (item.category) {
+      const tag = el("span", `news-tag tag-${item.category.toLowerCase()}`, item.category);
+      meta.append(tag);
     }
-    
-    article.append(title, meta);
-    grid.append(article);
+
+    if (item.publisher || item.related_ticker) {
+      const source = el("span", "news-source", item.publisher || item.related_ticker);
+      meta.append(source);
+    }
+
+    article.append(title, meta);    grid.append(article);
   }
   
   card.append(grid);
@@ -242,7 +248,7 @@ function renderNews(widget) {
 }
 
 function renderMiniCharts(widget) {
-  const card = el("section", "widget full-width");
+  const card = el("section", `widget ${widget.fullWidth ? "full-width" : ""}`);
   card.append(el("h3", null, widget.title));
   
   const grid = el("div", "mini-charts-grid");
@@ -386,7 +392,7 @@ function renderStockHero(widget) {
   const volRatio = widget.volumeRatio != null ? parseFloat(widget.volumeRatio).toFixed(2) : "n/a";
   const volNote = parseFloat(volRatio) > 1.5 ? "high" : parseFloat(volRatio) < 0.7 ? "low" : "normal";
 
-  const card = el("section", `widget full-width stock-hero-card ${widget.trend ? trendSentiment : changeClass}`);
+  const card = el("section", `widget ${widget.fullWidth ? "full-width" : ""} stock-hero-card ${widget.trend ? trendSentiment : changeClass}`);
   
   // Conditionally render the trend chip ONLY if a trend word is provided (for individual stocks, not snapshots)
   const trendChipHtml = widget.trend 
@@ -561,8 +567,23 @@ function renderScoreHero(widget) {
 
 function renderGroup(widget) {
   const cols = widget.columns || 3;
-  const container = el("div", `widget-group full-width widget-group-cols-${cols}`);
+  const container = el("div", `widget-group ${widget.fullWidth ? "full-width" : ""} widget-group-cols-${cols}`);
   container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  
+  if (widget.title) {
+    const card = el("section", `widget ${widget.fullWidth ? "full-width" : ""} group-card`);
+    card.append(el("h3", null, widget.title));
+    
+    const innerContainer = el("div", `widget-group widget-group-cols-${cols}`);
+    innerContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    for (const child of widget.widgets || []) {
+      const childEl = renderWidget(child);
+      if (childEl) innerContainer.append(childEl);
+    }
+    card.append(innerContainer);
+    return card;
+  }
+
   for (const child of widget.widgets || []) {
     const childEl = renderWidget(child);
     if (childEl) container.append(childEl);
@@ -837,17 +858,32 @@ function renderChart(descriptor) {
       datasets: datasets
     },
     options: {
+      indexAxis: descriptor.config?.indexAxis || "x",
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: true,
+          display: descriptor.config?.plugins?.legend?.display !== undefined ? descriptor.config.plugins.legend.display : (datasets.length > 1),
           labels: { color: textColor, font: { family: "'Inter', sans-serif" } }
         }
       },
       scales: descriptor.type === "doughnut" ? undefined : {
-        x: { grid: { display: false }, ticks: { color: textColor } },
-        y: { beginAtZero: false, grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: textColor } }
+        x: { 
+          grid: { 
+            display: descriptor.config?.indexAxis === "y", 
+            color: "rgba(255,255,255,0.05)" 
+          }, 
+          ticks: { color: textColor },
+          beginAtZero: true
+        },
+        y: { 
+          beginAtZero: true, 
+          grid: { 
+            display: descriptor.config?.indexAxis !== "y",
+            color: "rgba(255,255,255,0.05)" 
+          }, 
+          ticks: { color: textColor } 
+        }
       }
     }
   };

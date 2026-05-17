@@ -66,7 +66,15 @@ def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
 
 def _news_items() -> list[NewsItem]:
     items: list[NewsItem] = []
-    for ticker in ("^AXJO", "BHP.AX", "CBA.AX", "RIO.AX"):
+    # Mix of ASX local, Global Indices, and Commodities to catch Geopolitics (e.g. Oil/Gold/VIX)
+    ticker_map = {
+        "^AXJO": "Market",
+        "CL=F": "Energy",
+        "GC=F": "Metals",
+        "^GSPC": "Macro",
+        "^VIX": "Risk"
+    }
+    for ticker, category in ticker_map.items():
         for item in get_news(ticker, 5):
             published = item.get("providerPublishTime") or item.get("pubDate")
             if isinstance(published, int):
@@ -76,7 +84,14 @@ def _news_items() -> list[NewsItem]:
             url = item.get("link") or item.get("url") or content.get("canonicalUrl", {}).get("url")
             publisher = item.get("publisher") or content.get("provider", {}).get("displayName")
             if title:
-                items.append(NewsItem(title=title, publisher=publisher, published=published, url=url, related_ticker=ticker))
+                items.append(NewsItem(
+                    title=title, 
+                    publisher=publisher, 
+                    published=published, 
+                    url=url, 
+                    related_ticker=ticker,
+                    category=category
+                ))
     seen: set[str] = set()
     unique: list[NewsItem] = []
     for item in items:
@@ -98,7 +113,12 @@ def get_market_snapshot() -> MarketSnapshot:
 
     sectors: list[SectorPerf] = []
     for code, name in SECTOR_PROXIES.items():
-        sectors.append(SectorPerf(code=code, name=name, one_d_pct=_pct_change(code, "5d", days=2)))
+        sectors.append(SectorPerf(
+            code=code, 
+            name=name, 
+            one_d_pct=_pct_change(code, "5d", days=2),
+            series=_history(code, "3mo")
+        ))
     sectors.sort(key=lambda item: item.one_d_pct if item.one_d_pct is not None else -999, reverse=True)
 
     return MarketSnapshot(
@@ -124,15 +144,21 @@ def get_market_snapshot() -> MarketSnapshot:
             crude_oil_usd=_last_close("CL=F"),
             copper_usd=_last_close("HG=F"),
             coal_proxy_ticker=_last_close("WHC.AX"),
+            iron_ore_series=_history("QRE.AX"),
             gold_usd_series=_history("GC=F"),
             crude_oil_usd_series=_history("CL=F"),
             copper_usd_series=_history("HG=F"),
+            coal_series=_history("WHC.AX"),
         ),
         global_indices=GlobalIndices(
             sp500_1d_change=_pct_change("^GSPC", "5d", days=2),
             nasdaq_1d_change=_pct_change("^IXIC", "5d", days=2),
             shanghai_1d_change=_pct_change("000001.SS", "5d", days=2),
             hang_seng_1d_change=_pct_change("^HSI", "5d", days=2),
+            sp500_series=_history("^GSPC", "3mo"),
+            nasdaq_series=_history("^IXIC", "3mo"),
+            shanghai_series=_history("000001.SS", "3mo"),
+            hang_seng_series=_history("^HSI", "3mo"),
         ),
         news_headlines=_news_items(),
         errors=errors,

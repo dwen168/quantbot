@@ -25,6 +25,8 @@ class MacroCore:
     iron_ore_ytd: float | None
     sector_changes: dict[str, float | None]
     raw_rba: dict[str, Any]
+    commodities: dict[str, float | None]
+    global_indices_1d: dict[str, float | None]
 
 
 def _clean(value):
@@ -78,6 +80,21 @@ def fetch_macro_core() -> MacroCore:
         for code, name in SECTOR_PROXIES.items()
     }
 
+    # 5. Commodities
+    commodities = {
+        "gold": _last_close("GC=F"),
+        "oil": _last_close("CL=F"),
+        "copper": _last_close("HG=F"),
+        "iron_ore": _last_close("QRE.AX")
+    }
+
+    # 6. Global 1D Performance
+    global_indices = {
+        "sp500": _pct_change("^GSPC", "5d", days=2),
+        "nasdaq": _pct_change("^IXIC", "5d", days=2),
+        "shanghai": _pct_change("000001.SS", "5d", days=2)
+    }
+
     return MacroCore(
         cash_rate=cash_rate,
         vix=vix,
@@ -85,5 +102,7 @@ def fetch_macro_core() -> MacroCore:
         aud_cny_3m=aud_cny_3m,
         iron_ore_ytd=iron_ore_ytd,
         sector_changes=sector_changes,
-        raw_rba=rba_data
+        raw_rba=rba_data,
+        commodities=commodities,
+        global_indices_1d=global_indices
     )

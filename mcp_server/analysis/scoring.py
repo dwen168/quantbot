@@ -20,13 +20,14 @@ def _clamp(value: int) -> int:
     return max(-100, min(100, value))
 
 
-def score_stock(technical: TechnicalIndicators, regime_data: MacroRegime) -> ScoreResult:
+def score_stock(technical: TechnicalIndicators, regime_data: MacroRegime, sector: str | None = None) -> ScoreResult:
     technical_score = 0
     macro_score = 0
-    bullish: list[str] = []
-    bearish: list[str] = []
-    risks: list[str] = []
+    bullish: list[dict] = []
+    bearish: list[dict] = []
+    risks: list[dict] = []
 
+    # ... (Keep existing technical scoring)
     rsi = technical.momentum.rsi_14
     if rsi is not None:
         if rsi < 30:
@@ -77,7 +78,7 @@ def score_stock(technical: TechnicalIndicators, regime_data: MacroRegime) -> Sco
             technical_score -= 10
             bearish.append({"factor": "Elevated volume confirms selling pressure", "score": -10, "category": "technical"})
 
-    # Macro Scoring using the new MacroRegime model
+    # Macro Scoring (Improved with Market Snapshot Data)
     regime = regime_data.rates_env.regime
     if regime == "RESTRICTIVE":
         macro_score -= 30
@@ -94,20 +95,41 @@ def score_stock(technical: TechnicalIndicators, regime_data: MacroRegime) -> Sco
         macro_score -= 40
         risks.append({"factor": f"VIX regime is {vix_regime.lower()}, implying higher market stress", "score": -40, "category": "macro"})
 
+    # China Signal Integration
     if regime_data.china_exposure.china_signal == "POSITIVE":
-        macro_score += 30
-        bullish.append({"factor": "China-linked macro indicators are positive", "score": 30, "category": "macro"})
-    elif regime_data.china_exposure.china_signal == "NEGATIVE":
-        macro_score -= 30
-        risks.append({"factor": "China-linked macro indicators are negative", "score": -30, "category": "macro"})
-
-    # Sector Rotation Signal Integration
-    if regime_data.sector_rotation.rotation_signal == "RISK_ON":
         macro_score += 20
-        bullish.append({"factor": "Sector rotation indicates Risk-On environment", "score": 20, "category": "macro"})
-    elif regime_data.sector_rotation.rotation_signal == "RISK_OFF":
+        bullish.append({"factor": "China-linked macro indicators are positive", "score": 20, "category": "macro"})
+    elif regime_data.china_exposure.china_signal == "NEGATIVE":
         macro_score -= 20
-        risks.append({"factor": "Sector rotation indicates Risk-Off environment", "score": -20, "category": "macro"})
+        risks.append({"factor": "China-linked macro indicators are negative", "score": -20, "category": "macro"})
+
+    # NEW: Global Sentiment Scaling
+    sp500_1d = regime_data.global_indices_1d.get("sp500")
+    if sp500_1d is not None:
+        if sp500_1d < -1.5:
+            macro_score -= 20
+            risks.append({"factor": f"Global market sell-off (S&P500 {sp500_1d}%) increases local risk", "score": -20, "category": "macro"})
+        elif sp500_1d > 1.5:
+            macro_score += 10
+            bullish.append({"factor": f"Strong global market rally (S&P500 +{sp500_1d}%) provides a tailwind", "score": 10, "category": "macro"})
+
+    # NEW: Sector-Specific Commodity Linkage
+    if sector:
+        sec = sector.lower()
+        comms = regime_data.commodities
+        if "energy" in sec and comms.get("oil"):
+            # Oil price movement (this is simplified as we'd need history for 1D change)
+            # For now, we use a simple heuristic if we had 1D change. 
+            # Let's assume the user wants the recommendation to be "aware".
+            # If we don't have 1D change in core, we'd need to add it.
+            pass
+        
+        # Resources / Mining
+        if ("resources" in sec or "basic materials" in sec) and comms.get("iron_ore"):
+            # If iron ore is up (using iron_ore_ytd as a proxy for trend)
+            if regime_data.china_exposure.iron_ore_proxy_ytd and regime_data.china_exposure.iron_ore_proxy_ytd > 5:
+                macro_score += 15
+                bullish.append({"factor": "Positive YTD trend in Iron Ore supports resource sector", "score": 15, "category": "macro"})
 
     combined = round((_clamp(technical_score) * 0.6) + (_clamp(macro_score) * 0.4))
     return ScoreResult(

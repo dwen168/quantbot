@@ -15,6 +15,7 @@ class SectorPerf(BaseModel):
     code: str
     name: str
     one_d_pct: float | None = None
+    series: list[dict] | None = None
 
 
 class ASXMarket(BaseModel):
@@ -40,9 +41,11 @@ class Commodities(BaseModel):
     crude_oil_usd: float | None = None
     copper_usd: float | None = None
     coal_proxy_ticker: float | None = None
+    iron_ore_series: list[dict] | None = None
     gold_usd_series: list[dict] | None = None
     crude_oil_usd_series: list[dict] | None = None
     copper_usd_series: list[dict] | None = None
+    coal_series: list[dict] | None = None
 
 
 class GlobalIndices(BaseModel):
@@ -50,6 +53,10 @@ class GlobalIndices(BaseModel):
     nasdaq_1d_change: float | None = None
     shanghai_1d_change: float | None = None
     hang_seng_1d_change: float | None = None
+    sp500_series: list[dict] | None = None
+    nasdaq_series: list[dict] | None = None
+    shanghai_series: list[dict] | None = None
+    hang_seng_series: list[dict] | None = None
 
 
 class NewsItem(BaseModel):
@@ -58,6 +65,7 @@ class NewsItem(BaseModel):
     published: str | None = None
     url: str | None = None
     related_ticker: str | None = None
+    category: str | None = None
 
 
 class MacroInfo(BaseModel):
@@ -147,5 +155,7 @@ class MacroRegime(BaseModel):
     china_exposure: ChinaExposure = Field(default_factory=ChinaExposure)
     risk_sentiment: RiskSentiment = Field(default_factory=RiskSentiment)
     sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
+    commodities: dict[str, float | None] = Field(default_factory=dict)
+    global_indices_1d: dict[str, float | None] = Field(default_factory=dict)
     summary: str
     errors: list[str] = Field(default_factory=list)

@@ -227,6 +227,123 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 
+/* Thinking / Typing Animation */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: typing 1.4s infinite both;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+.thinking-text {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Welcome Experience Styles */
+.welcome-header {
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.welcome-header strong {
+  font-size: 16px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.welcome-header p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.cap-item {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.cap-item:hover {
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.05);
+  transform: translateY(-2px);
+}
+
+.cap-icon {
+  font-size: 20px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.cap-item strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
+.cap-item p {
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--muted);
+}
+
+.cap-item code {
+  display: block;
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid var(--line);
+}
+
+body.light .cap-item {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+body.light .cap-item code {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text);
+}
+
 .message.user .bubble {
   background: linear-gradient(135deg, var(--accent), #7c3aed);
   color: white;
@@ -594,7 +711,7 @@ body.light .indicator-bar {
 .chart-host {
   width: 100%;
   flex: 1;
-  min-height: 400px;
+  min-height: 300px;
   position: relative;
 }
 
@@ -671,6 +788,28 @@ body.light .news-card:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.news-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.tag-energy { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.tag-metals { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.tag-macro  { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.tag-market { background: rgba(167, 139, 250, 0.2); color: #a78bfa; }
+.tag-risk   { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.news-source {
+  opacity: 0.8;
 }
 
 /* Hide TradingView Watermark Globally */
@@ -998,6 +1137,28 @@ body.light .factor-item {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
+}
+
+.group-card .widget-group {
+  gap: 16px;
+}
+
+.group-card .widget,
+.group-card .chart-panel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 10px 0;
+  backdrop-filter: none;
+}
+
+.group-card .widget h3,
+.group-card .chart-panel h3 {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
 }
 
 /* Widget Descriptions */

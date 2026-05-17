@@ -6,28 +6,28 @@ function kv(id, title, rows, options = {}) {
   return { id, type: "kv", title, rows, ...options };
 }
 
-function factors(id, title, items) {
-  return { id, type: "factors", title, items: items || [] };
+function factors(id, title, items, options = {}) {
+  return { id, type: "factors", title, items: items || [], ...options };
 }
 
-function group(id, widgets) {
-  return { id, type: "group", widgets: widgets || [] };
+function group(id, widgets, options = {}) {
+  return { id, type: "group", widgets: widgets || [], ...options };
 }
 
-function signals(id, title, items) {
-  return { id, type: "signals", title, items: items || [] };
+function signals(id, title, items, options = {}) {
+  return { id, type: "signals", title, items: items || [], ...options };
 }
 
-function news(id, title, items) {
-  return { id, type: "news", title, items: items || [] };
+function news(id, title, items, options = {}) {
+  return { id, type: "news", title, items: items || [], ...options };
 }
 
-function miniCharts(id, title, items) {
-  return { id, type: "mini-charts", title, items: items || [] };
+function miniCharts(id, title, items, options = {}) {
+  return { id, type: "mini-charts", title, items: items || [], ...options };
 }
 
-function table(id, title, columns, rows) {
-  return { id, type: "table", title, columns, rows };
+function table(id, title, columns, rows, options = {}) {
+  return { id, type: "table", title, columns, rows, ...options };
 }
 
 function chart(id, type, title, config, options = {}) {
@@ -118,70 +118,116 @@ function buildMarketSnapshotCharts(data) {
   
   return {
     widgets: [
-      // 1. ASX200 Hero — Big and clear, uses color-only signal
+      // 1. ASX200 Hero — Full-width header
       {
         id: "market-hero",
         type: "stock-hero",
         symbol: "ASX 200",
         price: data.asx_market?.asx200_level,
         changePct: data.asx_market?.asx200_1d_change,
-        trend: null, // Strictly no qualitative signal words
+        trend: null,
+        fullWidth: true
       },
 
-      // 2. FX with Sparklines — Pure data
+      // 2. FX with Sparklines — Half-width
       miniCharts("fx-sparklines", "Foreign Exchange", [
-        { label: "AUD/USD", value: fmt(data.currencies?.aud_usd), series: data.currencies?.aud_usd_series },
-        { label: "AUD/CNY", value: fmt(data.currencies?.aud_cny), series: data.currencies?.aud_cny_series },
+        { label: "AUD/USD", value: data.currencies?.aud_usd != null ? `1D: ${fmt(data.currencies.aud_usd_1mo_change, "%")}` : "n/a", series: data.currencies?.aud_usd_series },
+        { label: "AUD/CNY", value: data.currencies?.aud_cny, series: data.currencies?.aud_cny_series },
       ]),
 
-      // 3. Commodities - Multi-column KV, hide qualitative badges
+      // 3. Commodities & Rates - Combined Trends and Info
       {
         id: "commodities-group",
         type: "group",
         columns: 2,
         widgets: [
-          kv("metals", "Metals", [
-            ["Gold (USD)", fmt(data.commodities?.gold_usd, "", "$")],
-            ["Copper (USD)", fmt(data.commodities?.copper_usd, "", "$")],
-            ["Iron Ore Proxy", fmt(data.commodities?.iron_ore_etf_proxy, "", "$")],
-          ], { hideBadges: true }),
-          kv("energy-other", "Energy & News", [
-            ["Crude Oil (USD)", fmt(data.commodities?.crude_oil_usd, "", "$")],
-            ["Coal Proxy", fmt(data.commodities?.coal_proxy_ticker, "", "$")],
-            ["RBA Cash Rate", fmt(data.asx_market?.rba_cash_rate, "%")],
-          ], { hideBadges: true })
+          miniCharts("metals", "Metals Trends (3M)", [
+            { label: "Gold (USD)", value: data.commodities?.gold_usd, series: data.commodities?.gold_usd_series },
+            { label: "Copper (USD)", value: data.commodities?.copper_usd, series: data.commodities?.copper_usd_series },
+            { label: "Iron Ore", value: data.commodities?.iron_ore_etf_proxy, series: data.commodities?.iron_ore_series },
+          ]),
+          {
+            id: "energy-rates-group",
+            type: "group",
+            columns: 1,
+            widgets: [
+              miniCharts("energy", "Energy Trends (3M)", [
+                { label: "Crude Oil", value: data.commodities?.crude_oil_usd, series: data.commodities?.crude_oil_usd_series },
+                { label: "Coal Proxy", value: data.commodities?.coal_proxy_ticker, series: data.commodities?.coal_series },
+              ]),
+              kv("rates-info", "Rates & News", [
+                ["RBA Cash Rate", fmt(data.asx_market?.rba_cash_rate, "%")],
+              ], { hideBadges: true })
+            ]
+          }
         ]
       },
 
-      // 4. News
-      news("news", "Latest Market News", data.news_headlines || [])
-    ],
-    charts: [
-      // 5. Sector Performance - Bar chart (Color is the signal)
-      chart("sector-performance", "bar", "Sector 1D Performance (%)", {
-        labels: sectors.map(s => s.name),
-        datasets: [{
-          label: "% Change",
-          data: sectors.map(s => s.one_d_pct),
-          backgroundColor: sectors.map(s => (s.one_d_pct >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"))
-        }]
-      }, { fullWidth: true }),
+      // 4. Sector Performance - Consolidated Card
+      {
+        id: "sector-performance-group",
+        type: "group",
+        title: "Sector Performance",
+        fullWidth: true,
+        columns: 1,
+        widgets: [
+          miniCharts("sector-trends", "3-Month Sector Trends", sectors.map(s => ({
+            label: s.name,
+            value: s.one_d_pct != null ? `1D: ${fmt(s.one_d_pct, "%")}` : "n/a",
+            series: s.series
+          }))),
+          chart("sector-performance-bar", "bar", "Daily Performance (%)", {
+            indexAxis: "y",
+            labels: sectors.map(s => s.name),
+            datasets: [{
+              data: sectors.map(s => s.one_d_pct),
+              backgroundColor: sectors.map(s => (s.one_d_pct >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)")),
+              borderRadius: 4
+            }]
+          }, { isChart: true })
+        ]
+      },
 
-      // 6. Global Indices
-      chart("global-indices", "bar", "Global Indices 1D Change (%)", {
-        indexAxis: "y",
-        labels: ["S&P 500", "Nasdaq", "Shanghai", "Hang Seng"],
-        datasets: [{
-          label: "% change",
-          data: [
-            data.global_indices?.sp500_1d_change,
-            data.global_indices?.nasdaq_1d_change,
-            data.global_indices?.shanghai_1d_change,
-            data.global_indices?.hang_seng_1d_change
-          ]
-        }]
-      }, { fullWidth: true })
-    ]
+      // 5. Global Indices - Consolidated Card
+      {
+        id: "global-indices-group",
+        type: "group",
+        title: "Global Indices",
+        fullWidth: true,
+        columns: 1,
+        widgets: [
+          miniCharts("global-trends", "3-Month Global Trends", [
+            { label: "S&P 500", value: data.global_indices?.sp500_1d_change != null ? `1D: ${fmt(data.global_indices.sp500_1d_change, "%")}` : "n/a", series: data.global_indices?.sp500_series },
+            { label: "Nasdaq", value: data.global_indices?.nasdaq_1d_change != null ? `1D: ${fmt(data.global_indices.nasdaq_1d_change, "%")}` : "n/a", series: data.global_indices?.nasdaq_series },
+            { label: "Shanghai", value: data.global_indices?.shanghai_1d_change != null ? `1D: ${fmt(data.global_indices.shanghai_1d_change, "%")}` : "n/a", series: data.global_indices?.shanghai_series },
+            { label: "Hang Seng", value: data.global_indices?.hang_seng_1d_change != null ? `1D: ${fmt(data.global_indices.hang_seng_1d_change, "%")}` : "n/a", series: data.global_indices?.hang_seng_series },
+          ]),
+          chart("global-indices-bar", "bar", "Daily Change (%)", {
+            indexAxis: "y",
+            labels: ["S&P 500", "Nasdaq", "Shanghai", "Hang Seng"],
+            datasets: [{
+              data: [
+                data.global_indices?.sp500_1d_change,
+                data.global_indices?.nasdaq_1d_change,
+                data.global_indices?.shanghai_1d_change,
+                data.global_indices?.hang_seng_1d_change
+              ],
+              backgroundColor: [
+                data.global_indices?.sp500_1d_change,
+                data.global_indices?.nasdaq_1d_change,
+                data.global_indices?.shanghai_1d_change,
+                data.global_indices?.hang_seng_1d_change
+              ].map(v => (v >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)")),
+              borderRadius: 4
+            }]
+          }, { isChart: true })
+        ]
+      },
+
+      // 6. News - Full-width at the bottom
+      news("news", "Market Headlines", data.news_headlines || [], { fullWidth: true })
+    ],
+    charts: []
   };
 }
 
@@ -289,28 +335,47 @@ function buildAnalysisCharts(data) {
         macroRiskCount: macroRisks.length
       },
 
-      // 2. Technical + Macro side by side
+      // 2. Technical Assessment — Flattened into 3 columns
       {
-        id: "sub-scores-group",
+        id: "technical-assessment-flattened",
         type: "group",
-        columns: 2,
+        title: "Technical Assessment",
+        fullWidth: true,
+        columns: 3,
         widgets: [
-          kv("technical-assessment", `Technical Assessment`, [
+          kv("tech-signal-core", "Price Action", [
             ["Verdict",    data.technical_assessment?.overall],
             ["Trend",      data.technical_assessment?.trend_signal],
             ["Momentum",   data.technical_assessment?.momentum_signal],
+          ]),
+          kv("tech-market-dynamics", "Market Dynamics", [
             ["Volatility", data.technical_assessment?.volatility_signal],
             ["Volume",     data.technical_assessment?.volume_signal],
+          ]),
+          kv("tech-price-plan", "Price Targets", [
             ["Support",    fmt(data.technical_assessment?.key_levels?.support,               "", "$")],
             ["Resistance", fmt(data.technical_assessment?.key_levels?.resistance,            "", "$")],
             ["Stop Loss",  fmt(data.technical_assessment?.key_levels?.stop_loss_suggestion,  "", "$")],
-          ], { description: "Technical score (60% weight) — evaluates price trend, momentum, moving average alignment, volatility and volume." }),
-          kv("macro-assessment", `Macro Assessment`, [
+          ]),
+        ]
+      },
+
+      // 3. Macro Assessment — Flattened into 2 columns
+      {
+        id: "macro-assessment-flattened",
+        type: "group",
+        title: "Macro Assessment",
+        fullWidth: true,
+        columns: 2,
+        widgets: [
+          kv("macro-regime-core", "Regime & Sentiment", [
             ["Verdict",        data.macro_assessment?.overall],
             ["Risk Sentiment", data.macro_assessment?.risk_sentiment],
-            ["Rates Headwind", data.macro_assessment?.rates_env?.regime === "RESTRICTIVE" ? "Yes ⚠️" : "No ✅"],
+          ]),
+          kv("macro-external-drivers", "External Drivers", [
+            ["Rates Headwind", data.macro_assessment?.rates_headwind ? "Yes ⚠️" : "No ✅"],
             ["China Tailwind", data.macro_assessment?.china_tailwind ? "Yes ✅" : "No"],
-          ], { description: "Macro score (40% weight) — evaluates RBA rates regime, VIX risk environment, and China macro linkage." }),
+          ]),
         ]
       },
 

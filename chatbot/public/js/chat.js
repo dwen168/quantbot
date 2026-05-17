@@ -107,7 +107,15 @@ export function initChat() {
     input.value = "";
     appendMessage("user", markdown(message));
     history.push({ role: "user", content: message });
-    const typing = appendMessage("assistant", "<p>Working...</p>");
+    
+    // Professional Thinking/Typing Indicator
+    const typingHtml = `
+      <span class="thinking-text">QuantBot is thinking</span>
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+    const typing = appendMessage("assistant", typingHtml);
 
     try {
       const response = await fetch("/api/chat", {
