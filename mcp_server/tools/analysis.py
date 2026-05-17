@@ -12,8 +12,7 @@ from mcp_server.models.recommendation import (
     StockAnalysis,
     TechnicalAssessment,
 )
-from mcp_server.tools.macro_anchor import get_macro_anchors
-from mcp_server.tools.macro_info import get_macro_info
+from mcp_server.tools.macro_regime import get_macro_regime
 from mcp_server.tools.technical import get_technical_indicators
 
 
@@ -41,9 +40,8 @@ def _key_levels(prices: list[float], current: float | None) -> KeyLevels:
 def analyze_stock(ticker: str) -> StockAnalysis:
     symbol = normalize_asx_ticker(ticker)
     technical = get_technical_indicators(ticker, "2y")
-    macro = get_macro_info()
-    anchors = get_macro_anchors()
-    scored = score_stock(technical, macro, anchors)
+    regime = get_macro_regime()
+    scored = score_stock(technical, regime)
     info = get_info(symbol)
     closes = [candle.close for candle in technical.price_series if candle.close is not None]
 
@@ -88,10 +86,10 @@ def analyze_stock(ticker: str) -> StockAnalysis:
         ),
         macro_assessment=MacroAssessment(
             overall=macro_overall,
-            rates_headwind=anchors.rates_environment.regime == "RESTRICTIVE",
-            china_tailwind=anchors.china_exposure.china_signal == "POSITIVE",
-            commodity_tailwind=macro.commodities.copper_usd is not None or macro.commodities.gold_usd is not None,
-            risk_sentiment=anchors.risk_sentiment.vix_regime,
+            rates_headwind=regime.rates_env.regime == "RESTRICTIVE",
+            china_tailwind=regime.china_exposure.china_signal == "POSITIVE",
+            commodity_tailwind=regime.sector_rotation.rotation_signal == "RISK_ON",
+            risk_sentiment=regime.risk_sentiment.vix_regime,
         ),
         bullish_signals=scored.bullish_signals[:8],
         bearish_signals=scored.bearish_signals[:8],

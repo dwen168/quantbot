@@ -22,12 +22,12 @@ function stockMessage(data) {
   return `**${data.symbol}** last traded at **${money(data.last_price)}** over the selected period, with a period change of **${pct(data.price_change_pct)}**.\n\nRSI is **${rsi}**, trend is **${trend}**.\n\n${signals}`;
 }
 
-function macroInfoMessage(data) {
-  return `**ASX macro snapshot (${data.as_of_date})**\n\n- RBA cash rate: **${pct(data.rba_policy?.cash_rate)}** (${data.rba_policy?.rate_direction || "unknown"})\n- ASX200: **${data.asx_market?.asx200_level ?? "n/a"}**, 1D **${pct(data.asx_market?.asx200_1d_change)}**\n- AUD/USD: **${data.currencies?.aud_usd ?? "n/a"}**\n- Gold: **${data.commodities?.gold_usd ?? "n/a"}**, Oil: **${data.commodities?.crude_oil_usd ?? "n/a"}**`;
+function marketSnapshotMessage(data) {
+  return `**ASX market snapshot (${data.as_of_date})**\n\n- ASX200: **${data.asx_market?.asx200_level ?? "n/a"}**, 1D **${pct(data.asx_market?.asx200_1d_change)}**\n- AUD/USD: **${data.currencies?.aud_usd ?? "n/a"}**\n- Gold: **${data.commodities?.gold_usd ?? "n/a"}**, Oil: **${data.commodities?.crude_oil_usd ?? "n/a"}**`;
 }
 
-function macroAnchorMessage(data) {
-  return `**Macro anchors (${data.as_of_date})**\n\n${data.summary}\n\n- Cash rate: **${pct(data.rates_environment?.rba_cash_rate)}**\n- Rate regime: **${data.rates_environment?.regime || "n/a"}**\n- VIX: **${data.risk_sentiment?.vix_level ?? "n/a"}** (${data.risk_sentiment?.vix_regime || "n/a"})\n- China signal: **${data.china_exposure?.china_signal || "n/a"}**`;
+function macroRegimeMessage(data) {
+  return `**Macro regime (${data.as_of_date})**\n\n${data.summary}\n\n- Cash rate: **${pct(data.rates_env?.rba_cash_rate)}**\n- Rate regime: **${data.rates_env?.regime || "n/a"}**\n- VIX: **${data.risk_sentiment?.vix_level ?? "n/a"}** (${data.risk_sentiment?.vix_regime || "n/a"})\n- China signal: **${data.china_exposure?.china_signal || "n/a"}**`;
 }
 
 function analysisMessage(data) {
@@ -44,8 +44,8 @@ function recommendationMessage(data) {
 
 function templateMessage(tool, data) {
   if (tool === "get_technical_indicators") return stockMessage(data);
-  if (tool === "get_macro_info") return macroInfoMessage(data);
-  if (tool === "get_macro_anchors") return macroAnchorMessage(data);
+  if (tool === "get_market_snapshot") return marketSnapshotMessage(data);
+  if (tool === "get_macro_regime") return macroRegimeMessage(data);
   if (tool === "analyze_stock") return analysisMessage(data);
   if (tool === "recommend_stock") return recommendationMessage(data);
   return "I found data, but could not format a response for that tool.";
@@ -67,6 +67,14 @@ router.post("/", async (req, res) => {
   }
 
   const routed = await routeIntent(message);
+
+  if (routed.intent === "INVALID_TICKER") {
+    return res.status(400).json({
+      error: `The ticker "${routed.params?.ticker}" does not appear to be a valid ASX stock. Please check the symbol and try again.`,
+      code: "INVALID_TICKER"
+    });
+  }
+
   const tool = toolForIntent(routed.intent);
   if (!tool) {
     let fallbackMessage = null;
@@ -115,10 +123,30 @@ router.post("/", async (req, res) => {
       params.period = "2y";
     }
     const rawData = await callTool(tool, params);
+
+    // Check if the data returned contains an error from yfinance (common in this project's pattern)
+    if (rawData && (rawData.error || (rawData.symbol && !rawData.last_price && !rawData.price_series?.length))) {
+      const errorMsg = rawData.error || "";
+      if (errorMsg.includes("No OHLCV data") || errorMsg.includes("not found") || errorMsg.includes("Ticker is required")) {
+        return res.status(404).json({
+          error: `I couldn't find any data for "${params.ticker}". It may not be listed on the ASX or the ticker symbol is incorrect.`,
+          code: "TICKER_NOT_FOUND_ON_ASX"
+        });
+      }
+    }
+
     const { charts, widgets } = buildDashboard(tool, rawData);
     const responseMessage = await maybeSummarize({ tool, data: rawData, model });
     return res.json({ message: responseMessage, tool, params, rawData, charts, widgets });
   } catch (error) {
+    const errorMsg = error.message || "";
+    if (errorMsg.includes("No OHLCV data") || errorMsg.includes("not found")) {
+      return res.status(404).json({
+        error: `The stock "${routed.params?.ticker}" was not found on the ASX. Please verify the ticker symbol.`,
+        code: "TICKER_NOT_FOUND_ON_ASX"
+      });
+    }
+
     return res.status(502).json({
       error: error.message || "MCP tool call failed.",
       code: "MCP_TOOL_FAILED"

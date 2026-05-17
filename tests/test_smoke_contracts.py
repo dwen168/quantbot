@@ -5,8 +5,8 @@ import os
 import pytest
 
 from mcp_server.tools.analysis import analyze_stock
-from mcp_server.tools.macro_anchor import get_macro_anchors
-from mcp_server.tools.macro_info import get_macro_info
+from mcp_server.tools.macro_regime import get_macro_regime
+from mcp_server.tools.market_snapshot import get_market_snapshot
 from mcp_server.tools.recommendation import recommend_stock
 from mcp_server.tools.technical import get_technical_indicators
 
@@ -25,15 +25,14 @@ def test_technical_indicators_live_contract():
     assert result.price_series
 
 
-def test_macro_info_live_contract():
-    result = get_macro_info()
+def test_market_snapshot_live_contract():
+    result = get_market_snapshot()
     assert result.as_of_date
-    assert result.rba_policy.data_source == "RBA A2 Table CSV"
     assert result.asx_market.asx200_level is not None
 
 
-def test_macro_anchors_live_contract():
-    result = get_macro_anchors()
+def test_macro_regime_live_contract():
+    result = get_macro_regime()
     assert result.as_of_date
     assert result.risk_sentiment.vix_regime in {"LOW", "NORMAL", "ELEVATED", "EXTREME", "UNKNOWN"}
     assert result.summary

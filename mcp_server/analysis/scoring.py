@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mcp_server.models.macro import MacroAnchors, MacroInfo
+from mcp_server.models.macro import MacroRegime
 from mcp_server.models.technical import TechnicalIndicators
 
 
@@ -20,7 +20,7 @@ def _clamp(value: int) -> int:
     return max(-100, min(100, value))
 
 
-def score_stock(technical: TechnicalIndicators, macro: MacroInfo, anchors: MacroAnchors) -> ScoreResult:
+def score_stock(technical: TechnicalIndicators, regime_data: MacroRegime) -> ScoreResult:
     technical_score = 0
     macro_score = 0
     bullish: list[str] = []
@@ -77,7 +77,8 @@ def score_stock(technical: TechnicalIndicators, macro: MacroInfo, anchors: Macro
             technical_score -= 10
             bearish.append({"factor": "Elevated volume confirms selling pressure", "score": -10, "category": "technical"})
 
-    regime = anchors.rates_environment.regime
+    # Macro Scoring using the new MacroRegime model
+    regime = regime_data.rates_env.regime
     if regime == "RESTRICTIVE":
         macro_score -= 30
         risks.append({"factor": "Restrictive RBA policy can pressure equity valuations", "score": -30, "category": "macro"})
@@ -85,7 +86,7 @@ def score_stock(technical: TechnicalIndicators, macro: MacroInfo, anchors: Macro
         macro_score += 30
         bullish.append({"factor": "Accommodative rates are supportive for equities", "score": 30, "category": "macro"})
 
-    vix_regime = anchors.risk_sentiment.vix_regime
+    vix_regime = regime_data.risk_sentiment.vix_regime
     if vix_regime in {"LOW", "NORMAL"}:
         macro_score += 20
         bullish.append({"factor": f"VIX regime is {vix_regime.lower()}, supporting risk appetite", "score": 20, "category": "macro"})
@@ -93,18 +94,20 @@ def score_stock(technical: TechnicalIndicators, macro: MacroInfo, anchors: Macro
         macro_score -= 40
         risks.append({"factor": f"VIX regime is {vix_regime.lower()}, implying higher market stress", "score": -40, "category": "macro"})
 
-    if anchors.china_exposure.china_signal == "POSITIVE":
+    if regime_data.china_exposure.china_signal == "POSITIVE":
         macro_score += 30
         bullish.append({"factor": "China-linked macro indicators are positive", "score": 30, "category": "macro"})
-    elif anchors.china_exposure.china_signal == "NEGATIVE":
+    elif regime_data.china_exposure.china_signal == "NEGATIVE":
         macro_score -= 30
         risks.append({"factor": "China-linked macro indicators are negative", "score": -30, "category": "macro"})
 
-    if macro.commodities.gold_usd or macro.commodities.crude_oil_usd or macro.commodities.copper_usd:
-        commodity_values = [macro.commodities.gold_usd, macro.commodities.crude_oil_usd, macro.commodities.copper_usd]
-        if sum(value is not None for value in commodity_values) >= 2:
-            macro_score += 20
-            bullish.append({"factor": "Key commodity market context (metals/energy) is positive", "score": 20, "category": "macro"})
+    # Sector Rotation Signal Integration
+    if regime_data.sector_rotation.rotation_signal == "RISK_ON":
+        macro_score += 20
+        bullish.append({"factor": "Sector rotation indicates Risk-On environment", "score": 20, "category": "macro"})
+    elif regime_data.sector_rotation.rotation_signal == "RISK_OFF":
+        macro_score -= 20
+        risks.append({"factor": "Sector rotation indicates Risk-Off environment", "score": -20, "category": "macro"})
 
     combined = round((_clamp(technical_score) * 0.6) + (_clamp(macro_score) * 0.4))
     return ScoreResult(

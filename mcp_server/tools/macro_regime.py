@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 from datetime import date
-
 import pandas as pd
 
 from mcp_server.data import abs_client
-from mcp_server.data.rba_client import get_cash_rate
+from mcp_server.data.macro_core import SECTOR_PROXIES, fetch_macro_core
 from mcp_server.data.yfinance_client import get_ohlcv
 from mcp_server.models.macro import (
     ChinaExposure,
     GrowthData,
     InflationData,
-    MacroAnchors,
+    MacroRegime,
     RatesEnv,
     RiskSentiment,
     SectorRotation,
 )
-from mcp_server.tools.macro_info import SECTOR_PROXIES, _pct_change
-
 
 def _clean(value):
     try:
@@ -27,15 +24,6 @@ def _clean(value):
     except Exception:
         return None
 
-
-def _last_close(ticker: str, period: str = "1mo") -> float | None:
-    try:
-        close = get_ohlcv(ticker, period)["Close"].dropna()
-        return _clean(close.iloc[-1]) if not close.empty else None
-    except Exception:
-        return None
-
-
 def _asx_volatility_20d() -> float | None:
     try:
         close = get_ohlcv("^AXJO", "3mo")["Close"].dropna()
@@ -43,7 +31,6 @@ def _asx_volatility_20d() -> float | None:
         return _clean(returns.tail(20).std() * (252 ** 0.5) * 100)
     except Exception:
         return None
-
 
 def _vix_regime(vix: float | None) -> str:
     if vix is None:
@@ -57,64 +44,59 @@ def _vix_regime(vix: float | None) -> str:
     return "EXTREME"
 
 
-def get_macro_anchors() -> MacroAnchors:
-    errors: list[str] = []
-    cash = get_cash_rate()
-    if cash.get("error"):
-        errors.append(f"RBA cash rate unavailable: {cash['error']}")
-    cash_rate = cash.get("cash_rate")
-    au_10y = None
-    yield_curve = _clean(au_10y - cash_rate) if au_10y is not None and cash_rate is not None else None
+def get_macro_regime() -> MacroRegime:
+    """
+    Step 4: New analysis-oriented tool.
+    Focuses on 'What is the underlying economic environment?'
+    Used for scoring and deep context.
+    """
+    core = fetch_macro_core()
+    errors = []
+    if core.raw_rba.get("error"):
+        errors.append(f"RBA data issue: {core.raw_rba['error']}")
+
+    # 1. Rates
+    cash_rate = core.cash_rate
+    au_10y = None # Still placeholder or could be fetched
+    yield_curve = None
     regime = "UNKNOWN"
     if cash_rate is not None:
         regime = "RESTRICTIVE" if cash_rate >= 4 else ("ACCOMMODATIVE" if cash_rate <= 1.5 else "NEUTRAL")
 
+    # 2. ABS Data
     cpi = abs_client.get_cpi()
     gdp = abs_client.get_gdp()
     unemployment = abs_client.get_unemployment()
-    cpi_yoy = cpi.get("latest_cpi_yoy") if cpi else None
-    trimmed = cpi.get("latest_trimmed_mean") if cpi else None
-
-    shanghai_ytd = _pct_change("000001.SS", "ytd")
-    aud_cny_3m = _pct_change("AUDCNY=X", "3mo")
-    iron_ore_ytd = _pct_change("QRE.AX", "ytd")
+    
+    # 3. China Signal
     china_score = sum(
         1 if value is not None and value > 2 else (-1 if value is not None and value < -2 else 0)
-        for value in (shanghai_ytd, aud_cny_3m, iron_ore_ytd)
+        for value in (core.shanghai_ytd, core.aud_cny_3m, core.iron_ore_ytd)
     )
     china_signal = "POSITIVE" if china_score > 0 else ("NEGATIVE" if china_score < 0 else "NEUTRAL")
 
-    vix = _last_close("^VIX", "5d")
-    sector_changes = [
-        (name, _pct_change(code, "1mo"))
-        for code, name in SECTOR_PROXIES.items()
-    ]
-    outperformers = [name for name, change in sector_changes if change is not None and change > 0]
-    underperformers = [name for name, change in sector_changes if change is not None and change < 0]
+    # 4. Risk Sentiment
+    vix = core.vix
+    vix_regime_str = _vix_regime(vix)
+
+    # 5. Sector Rotation
+    sector_changes = core.sector_changes
+    outperformers = [name for name, change in sector_changes.items() if change is not None and change > 0]
+    underperformers = [name for name, change in sector_changes.items() if change is not None and change < 0]
+    
     rotation = "MIXED"
-    if {"Resources", "Technology"}.intersection(outperformers) and _vix_regime(vix) in {"LOW", "NORMAL"}:
+    if {"Resources", "Technology"}.intersection(outperformers) and vix_regime_str in {"LOW", "NORMAL"}:
         rotation = "RISK_ON"
-    elif {"Property", "Broad Market"}.intersection(underperformers) or _vix_regime(vix) in {"ELEVATED", "EXTREME"}:
+    elif {"Property", "Broad Market"}.intersection(underperformers) or vix_regime_str in {"ELEVATED", "EXTREME"}:
         rotation = "RISK_OFF"
 
-    summary = f"Rates look {regime.lower()}, China signal is {china_signal.lower()}, and risk sentiment is {_vix_regime(vix).lower()}."
-    data_note = None
-    if not any((cpi, gdp, unemployment)):
-        data_note = "ABS CPI, GDP, and unemployment fields are best-effort and currently unavailable."
-
-    # Fetch 3-month series for sector trend chart
+    # Fetch 3-month series for sector trend chart (contextual supporting data)
     trend_labels = []
     trend_datasets = []
     try:
-        colors = {
-            "Broad Market": "#64748b",
-            "Resources": "#f59e0b",
-            "Financials": "#3b82f6",
-            "Technology": "#10b981",
-        }
+        colors = {"Broad Market": "#64748b", "Resources": "#f59e0b", "Financials": "#3b82f6", "Technology": "#10b981"}
         for code, name in SECTOR_PROXIES.items():
-            if name == "Property":
-                continue  # Skip to avoid too many lines
+            if name == "Property": continue
             df = get_ohlcv(code, "3mo")
             if not df.empty:
                 df = df.dropna(subset=["Close"])
@@ -124,44 +106,41 @@ def get_macro_anchors() -> MacroAnchors:
                     if not trend_labels:
                         trend_labels = [d.strftime("%Y-%m-%d") for d in df.index]
                     trend_datasets.append({
-                        "label": name,
-                        "data": normalized.tolist(),
-                        "borderColor": colors.get(name, "#999999"),
-                        "borderWidth": 2,
-                        "pointRadius": 0,
-                        "tension": 0.3
+                        "label": name, "data": normalized.tolist(), 
+                        "borderColor": colors.get(name, "#999999"), "borderWidth": 2, "pointRadius": 0, "tension": 0.3
                     })
     except Exception as e:
         errors.append(f"Failed to fetch sector trend data: {e}")
 
-    return MacroAnchors(
+    summary = f"Rates look {regime.lower()}, China signal is {china_signal.lower()}, and risk sentiment is {vix_regime_str.lower()}."
+
+    return MacroRegime(
         as_of_date=date.today().isoformat(),
-        rates_environment=RatesEnv(
+        rates_env=RatesEnv(
             rba_cash_rate=cash_rate,
             au_10y_bond_yield=au_10y,
             yield_curve_slope=yield_curve,
             regime=regime,
         ),
         inflation=InflationData(
-            latest_cpi_yoy=cpi_yoy,
-            latest_trimmed_mean=trimmed,
-            above_target=bool(cpi_yoy is not None and cpi_yoy > 3),
+            latest_cpi_yoy=cpi.get("latest_cpi_yoy") if cpi else None,
+            latest_trimmed_mean=cpi.get("latest_trimmed_mean") if cpi else None,
+            above_target=bool(cpi.get("latest_cpi_yoy") is not None and cpi.get("latest_cpi_yoy") > 3) if cpi else False,
         ),
         growth=GrowthData(
             gdp_growth_yoy=gdp.get("gdp_growth_yoy") if gdp else None,
             unemployment_rate=unemployment.get("unemployment_rate") if unemployment else None,
-            retail_sales_mom=None,
         ),
         china_exposure=ChinaExposure(
-            shanghai_comp_ytd=shanghai_ytd,
-            aud_cny_3mo_change=aud_cny_3m,
-            iron_ore_proxy_ytd=iron_ore_ytd,
+            shanghai_comp_ytd=core.shanghai_ytd,
+            aud_cny_3mo_change=core.aud_cny_3m,
+            iron_ore_proxy_ytd=core.iron_ore_ytd,
             china_signal=china_signal,
         ),
         risk_sentiment=RiskSentiment(
             vix_level=vix,
             asx200_volatility_20d=_asx_volatility_20d(),
-            vix_regime=_vix_regime(vix),
+            vix_regime=vix_regime_str,
         ),
         sector_rotation=SectorRotation(
             outperforming_sectors=outperformers,
@@ -171,6 +150,5 @@ def get_macro_anchors() -> MacroAnchors:
             trend_datasets=trend_datasets,
         ),
         summary=summary,
-        data_note=data_note,
         errors=errors,
     )

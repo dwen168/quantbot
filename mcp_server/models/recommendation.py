@@ -64,6 +64,11 @@ class PriceGuidance(BaseModel):
     downside_risk_pct: float | None = None
 
 
+class MarketContext(BaseModel):
+    asx200_level: float | None = None
+    aud_usd: float | None = None
+
+
 class Recommendation(BaseModel):
     symbol: str
     company_name: str
@@ -75,5 +80,6 @@ class Recommendation(BaseModel):
     price_guidance: PriceGuidance
     key_reasons: list[SignalFactor] = Field(default_factory=list)
     key_risks: list[SignalFactor] = Field(default_factory=list)
+    market_context: MarketContext = Field(default_factory=MarketContext)
     underlying_analysis: StockAnalysis
     narrative: str | None = None

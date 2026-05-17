@@ -8,8 +8,8 @@ const TOOL_LABELS = {
   get_technical_indicators: "📊 Technical Analysis",
   analyze_stock:            "🔬 Deep Analysis",
   recommend_stock:          "⭐ Trade Recommendation",
-  get_macro_anchors:        "🌐 Market Anchors",
-  get_macro_info:           "📰 Macro Conditions",
+  get_macro_regime:         "🌐 Macro Regime",
+  get_market_snapshot:      "📰 Market Snapshot",
 };
 
 function friendlyTool(tool) {

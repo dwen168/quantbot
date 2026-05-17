@@ -22,6 +22,7 @@ class ASXMarket(BaseModel):
     asx200_1d_change: float | None = None
     asx200_1mo_change: float | None = None
     asx200_ytd_change: float | None = None
+    rba_cash_rate: float | None = None
     top_sectors: list[SectorPerf] = Field(default_factory=list)
 
 
@@ -121,4 +122,30 @@ class MacroAnchors(BaseModel):
     sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
     summary: str
     data_note: str | None = None
+    errors: list[str] = Field(default_factory=list)
+
+
+# New models for the refactor
+
+class MarketSnapshot(BaseModel):
+    """Display-oriented market overview."""
+    as_of_date: str
+    asx_market: ASXMarket = Field(default_factory=ASXMarket)
+    currencies: Currencies = Field(default_factory=Currencies)
+    commodities: Commodities = Field(default_factory=Commodities)
+    global_indices: GlobalIndices = Field(default_factory=GlobalIndices)
+    news_headlines: list[NewsItem] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class MacroRegime(BaseModel):
+    """Contextual drivers and regime signals for scoring and narrative."""
+    as_of_date: str
+    rates_env: RatesEnv = Field(default_factory=RatesEnv)
+    inflation: InflationData = Field(default_factory=InflationData)
+    growth: GrowthData = Field(default_factory=GrowthData)
+    china_exposure: ChinaExposure = Field(default_factory=ChinaExposure)
+    risk_sentiment: RiskSentiment = Field(default_factory=RiskSentiment)
+    sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
+    summary: str
     errors: list[str] = Field(default_factory=list)

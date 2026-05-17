@@ -146,7 +146,8 @@ function renderKv(widget) {
     }
 
     const row = el("div", "kv-row");
-    const interpretation = getIndicatorInterpretation(label, value);
+    // Respect the directive: if hideBadges is set, don't show qualitative signal words
+    const interpretation = widget.hideBadges ? null : getIndicatorInterpretation(label, value);
     
     const labelSpan = el("span", "kv-label", label);
     const explanation = getIndicatorExplanation(label);
@@ -368,7 +369,7 @@ function renderHero(widget) {
 }
 
 function renderStockHero(widget) {
-  // Trend determines the overall card sentiment (current technical picture)
+  // Trend determines the overall card sentiment if present
   const trendRaw = (widget.trend || "").toLowerCase();
   const trendSentiment = trendRaw.includes("uptrend") || trendRaw.includes("bullish")
     ? "bullish"
@@ -376,7 +377,6 @@ function renderStockHero(widget) {
     ? "bearish"
     : "neutral";
 
-  // Period change is purely informational — labelled clearly
   const change = parseFloat(widget.changePct);
   const changeUp = change >= 0;
   const changeArrow = changeUp ? "▲" : "▼";
@@ -386,7 +386,16 @@ function renderStockHero(widget) {
   const volRatio = widget.volumeRatio != null ? parseFloat(widget.volumeRatio).toFixed(2) : "n/a";
   const volNote = parseFloat(volRatio) > 1.5 ? "high" : parseFloat(volRatio) < 0.7 ? "low" : "normal";
 
-  const card = el("section", `widget full-width stock-hero-card ${trendSentiment}`);
+  const card = el("section", `widget full-width stock-hero-card ${widget.trend ? trendSentiment : changeClass}`);
+  
+  // Conditionally render the trend chip ONLY if a trend word is provided (for individual stocks, not snapshots)
+  const trendChipHtml = widget.trend 
+    ? `<span class="stock-meta-chip ${trendSentiment}">${widget.trend}</span>`
+    : "";
+  const trendNoteHtml = widget.trend
+    ? `<span class="stock-hero-trend-note">Current Technical Trend</span>`
+    : "";
+
   card.innerHTML = `
     <div class="stock-hero-left">
       <div class="stock-hero-symbol">${widget.symbol || "—"}</div>
@@ -395,13 +404,10 @@ function renderStockHero(widget) {
     </div>
     <div class="stock-hero-divider"></div>
     <div class="stock-hero-right">
-      <div class="stock-hero-trend-row">
-        <span class="stock-meta-chip ${trendSentiment}">${widget.trend || "—"}</span>
-        <span class="stock-hero-trend-note">Current Technical Trend</span>
-      </div>
+      ${trendChipHtml ? `<div class="stock-hero-trend-row">${trendChipHtml}${trendNoteHtml}</div>` : ""}
       <div class="stock-hero-stats">
         <div class="stock-hero-stat">
-          <span class="stock-stat-label">2Y Period Change</span>
+          <span class="stock-stat-label">${widget.trend ? '2Y Period Change' : 'Today\'s Change'}</span>
           <span class="stock-stat-value ${changeClass}">${changeLabel}</span>
         </div>
         <div class="stock-hero-stat">

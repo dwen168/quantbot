@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.analysis import analyze_stock as analyze_stock_impl
-from mcp_server.tools.macro_anchor import get_macro_anchors as get_macro_anchors_impl
-from mcp_server.tools.macro_info import get_macro_info as get_macro_info_impl
+from mcp_server.tools.macro_regime import get_macro_regime as get_macro_regime_impl
+from mcp_server.tools.market_snapshot import get_market_snapshot as get_market_snapshot_impl
 from mcp_server.tools.recommendation import recommend_stock as recommend_stock_impl
 from mcp_server.tools.technical import get_technical_indicators as get_technical_indicators_impl
 
@@ -21,15 +21,15 @@ def get_technical_indicators(ticker: str, period: str = "2y") -> dict:
 
 
 @mcp.tool()
-def get_macro_info() -> dict:
-    """Return current macro and market context relevant to ASX stocks."""
-    return get_macro_info_impl().model_dump()
+def get_market_snapshot() -> dict:
+    """Return a display-oriented market overview (prices, news, commodities) for the user."""
+    return get_market_snapshot_impl().model_dump()
 
 
 @mcp.tool()
-def get_macro_anchors() -> dict:
-    """Return structural macro anchors for ASX investors."""
-    return get_macro_anchors_impl().model_dump()
+def get_macro_regime() -> dict:
+    """Return structural economic signals and regime context used for analysis and scoring."""
+    return get_macro_regime_impl().model_dump()
 
 
 @mcp.tool()

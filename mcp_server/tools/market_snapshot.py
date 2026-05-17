@@ -4,26 +4,17 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 
-from mcp_server.data.rba_client import get_cash_rate
+from mcp_server.data.macro_core import SECTOR_PROXIES, fetch_macro_core
 from mcp_server.data.yfinance_client import get_news, get_ohlcv
 from mcp_server.models.macro import (
     ASXMarket,
     Commodities,
     Currencies,
     GlobalIndices,
-    MacroInfo,
+    MarketSnapshot,
     NewsItem,
-    RBAPolicy,
     SectorPerf,
 )
-
-SECTOR_PROXIES = {
-    "VAS.AX": "Broad Market",
-    "VAP.AX": "Property",
-    "QRE.AX": "Resources",
-    "QFN.AX": "Financials",
-    "ATEC.AX": "Technology",
-}
 
 
 def _clean(value):
@@ -52,6 +43,7 @@ def _pct_change(ticker: str, period: str = "1mo", days: int | None = None) -> fl
         return _clean(((close.iloc[-1] - start) / start) * 100)
     except Exception:
         return None
+
 
 def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
     try:
@@ -94,26 +86,30 @@ def _news_items() -> list[NewsItem]:
     return unique[:10]
 
 
-def get_macro_info() -> MacroInfo:
-    errors: list[str] = []
-    cash = get_cash_rate()
-    if cash.get("error"):
-        errors.append(f"RBA cash rate unavailable: {cash['error']}")
+def get_market_snapshot() -> MarketSnapshot:
+    """
+    Step 4: New display-oriented tool.
+    Focuses on 'What is happening in the market right now?'
+    """
+    core = fetch_macro_core()
+    errors = []
+    if core.raw_rba.get("error"):
+        errors.append(f"RBA data issue: {core.raw_rba['error']}")
 
     sectors: list[SectorPerf] = []
     for code, name in SECTOR_PROXIES.items():
         sectors.append(SectorPerf(code=code, name=name, one_d_pct=_pct_change(code, "5d", days=2)))
     sectors.sort(key=lambda item: item.one_d_pct if item.one_d_pct is not None else -999, reverse=True)
 
-    return MacroInfo(
+    return MarketSnapshot(
         as_of_date=date.today().isoformat(),
-        rba_policy=RBAPolicy(**{key: value for key, value in cash.items() if key != "error"}),
         asx_market=ASXMarket(
             asx200_level=_last_close("^AXJO"),
             asx200_1d_change=_pct_change("^AXJO", "5d", days=2),
             asx200_1mo_change=_pct_change("^AXJO", "1mo"),
             asx200_ytd_change=_pct_change("^AXJO", "ytd"),
-            top_sectors=sectors[:5],
+            rba_cash_rate=core.cash_rate,
+            top_sectors=sectors,
         ),
         currencies=Currencies(
             aud_usd=_last_close("AUDUSD=X"),

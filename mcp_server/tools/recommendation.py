@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import date
 
 from mcp_server.analysis.llm_narrative import generate_narrative
-from mcp_server.models.recommendation import PriceGuidance, Recommendation
+from mcp_server.models.recommendation import MarketContext, PriceGuidance, Recommendation
 from mcp_server.tools.analysis import analyze_stock
+from mcp_server.tools.market_snapshot import get_market_snapshot
 
 
 def _decision(score: int) -> tuple[str, int]:
@@ -38,10 +39,6 @@ def recommend_stock(ticker: str) -> Recommendation:
     support = analysis.technical_assessment.key_levels.support
     resistance = analysis.technical_assessment.key_levels.resistance
 
-    with open("recommendation_debug.log", "a") as f:
-        f.write(f"DEBUG: ticker={ticker} current={current} raw_stop={raw_stop}\n")
-        f.write(f"DEBUG: analysis_dict={analysis.model_dump()}\n")
-
     # Stop loss: use the pre-calculated suggestion (8% below current)
     stop = raw_stop
 
@@ -74,6 +71,9 @@ def recommend_stock(ticker: str) -> Recommendation:
     fallback_risks = [{"factor": "Market data sources may be incomplete", "score": 0}]
     risks = (analysis.risk_factors or analysis.bearish_signals or fallback_risks)[:3]
 
+    # Fetch snapshot for market context
+    snapshot = get_market_snapshot()
+
     recommendation = Recommendation(
         symbol=analysis.symbol,
         company_name=analysis.company_name,
@@ -90,6 +90,10 @@ def recommend_stock(ticker: str) -> Recommendation:
             target_price=target,
             upside_pct=upside,
             downside_risk_pct=downside,
+        ),
+        market_context=MarketContext(
+            asx200_level=snapshot.asx_market.asx200_level,
+            aud_usd=snapshot.currencies.aud_usd
         ),
         key_reasons=reasons[:5],
         key_risks=risks,

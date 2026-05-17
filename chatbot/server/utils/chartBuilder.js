@@ -1,5 +1,5 @@
-function fmt(value, suffix = "", prefix = "") {
-  return value === null || value === undefined ? "n/a" : `${prefix}${value}${suffix}`;
+function fmt(value, suffix = "", prefix = "", fallback = "n/a") {
+  return value === null || value === undefined ? fallback : `${prefix}${value}${suffix}`;
 }
 
 function kv(id, title, rows, options = {}) {
@@ -112,33 +112,63 @@ function buildStockCharts(data) {
   };
 }
 
-
-function buildMacroInfoCharts(data) {
+function buildMarketSnapshotCharts(data) {
+  // Sort sectors by performance for the bar chart
+  const sectors = [...(data.asx_market?.top_sectors || [])].sort((a, b) => (b.one_d_pct || 0) - (a.one_d_pct || 0));
+  
   return {
     widgets: [
-      kv("rba-policy", "RBA Policy", [
-        ["Cash Rate", fmt(data.rba_policy?.cash_rate, "%")],
-        ["Direction", data.rba_policy?.rate_direction || "n/a"],
-        ["Last Change", data.rba_policy?.last_change_date || "n/a"],
-        ["Change", fmt(data.rba_policy?.last_change_bps, " bps")]
-      ]),
-      kv("asx200", "ASX200", [
-        ["Level", fmt(data.asx_market?.asx200_level)],
-        ["1D", fmt(data.asx_market?.asx200_1d_change, "%")],
-        ["1M", fmt(data.asx_market?.asx200_1mo_change, "%")],
-        ["YTD", fmt(data.asx_market?.asx200_ytd_change, "%")]
-      ]),
-      miniCharts("currency-commodity", "Currency & Commodity", [
+      // 1. ASX200 Hero — Big and clear, uses color-only signal
+      {
+        id: "market-hero",
+        type: "stock-hero",
+        symbol: "ASX 200",
+        price: data.asx_market?.asx200_level,
+        changePct: data.asx_market?.asx200_1d_change,
+        trend: null, // Strictly no qualitative signal words
+      },
+
+      // 2. FX with Sparklines — Pure data
+      miniCharts("fx-sparklines", "Foreign Exchange", [
         { label: "AUD/USD", value: fmt(data.currencies?.aud_usd), series: data.currencies?.aud_usd_series },
         { label: "AUD/CNY", value: fmt(data.currencies?.aud_cny), series: data.currencies?.aud_cny_series },
-        { label: "Gold", value: fmt(data.commodities?.gold_usd), series: data.commodities?.gold_usd_series },
-        { label: "Oil", value: fmt(data.commodities?.crude_oil_usd), series: data.commodities?.crude_oil_usd_series },
-        { label: "Copper", value: fmt(data.commodities?.copper_usd), series: data.commodities?.copper_usd_series }
       ]),
-      news("news", "News Headlines", data.news_headlines || [])
+
+      // 3. Commodities - Multi-column KV, hide qualitative badges
+      {
+        id: "commodities-group",
+        type: "group",
+        columns: 2,
+        widgets: [
+          kv("metals", "Metals", [
+            ["Gold (USD)", fmt(data.commodities?.gold_usd, "", "$")],
+            ["Copper (USD)", fmt(data.commodities?.copper_usd, "", "$")],
+            ["Iron Ore Proxy", fmt(data.commodities?.iron_ore_etf_proxy, "", "$")],
+          ], { hideBadges: true }),
+          kv("energy-other", "Energy & News", [
+            ["Crude Oil (USD)", fmt(data.commodities?.crude_oil_usd, "", "$")],
+            ["Coal Proxy", fmt(data.commodities?.coal_proxy_ticker, "", "$")],
+            ["RBA Cash Rate", fmt(data.asx_market?.rba_cash_rate, "%")],
+          ], { hideBadges: true })
+        ]
+      },
+
+      // 4. News
+      news("news", "Latest Market News", data.news_headlines || [])
     ],
     charts: [
-      chart("global-indices", "bar", "Global Indices 1D Change", {
+      // 5. Sector Performance - Bar chart (Color is the signal)
+      chart("sector-performance", "bar", "Sector 1D Performance (%)", {
+        labels: sectors.map(s => s.name),
+        datasets: [{
+          label: "% Change",
+          data: sectors.map(s => s.one_d_pct),
+          backgroundColor: sectors.map(s => (s.one_d_pct >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"))
+        }]
+      }, { fullWidth: true }),
+
+      // 6. Global Indices
+      chart("global-indices", "bar", "Global Indices 1D Change (%)", {
         indexAxis: "y",
         labels: ["S&P 500", "Nasdaq", "Shanghai", "Hang Seng"],
         datasets: [{
@@ -150,84 +180,79 @@ function buildMacroInfoCharts(data) {
             data.global_indices?.hang_seng_1d_change
           ]
         }]
-      })
+      }, { fullWidth: true })
     ]
   };
 }
 
-function buildMacroAnchorCharts(data) {
+function buildMacroRegimeCharts(data) {
+  const ratesDescription = data.rates_env?.regime === "RESTRICTIVE" 
+    ? "Current rates are above the neutral level, designed to curb inflation by slowing economic activity."
+    : data.rates_env?.regime === "ACCOMMODATIVE"
+    ? "Rates are low to support economic growth and investment."
+    : "Rates are at a neutral level, neither strongly restricting nor stimulating the economy.";
+
   return {
     widgets: [
-      // Row 1: Macro Hero banner with the most critical summary
+      // 1. Macro Hero — Badge text is the core content
       {
         id: "macro-hero",
         type: "macro-hero",
-        regime: data.rates_environment?.regime || "UNKNOWN",
+        regime: data.rates_env?.regime || "UNKNOWN",
         chinaSignal: data.china_exposure?.china_signal || "NEUTRAL",
         vixRegime: data.risk_sentiment?.vix_regime || "UNKNOWN",
-        summary: data.summary || "Macro regime snapshot"
+        summary: data.summary || "Structural macro environment overview."
       },
-      // Row 2: Grouped core macro data
+
+      // 2. Structural Drivers Group
       {
-        id: "macro-core-group",
+        id: "regime-drivers",
         type: "group",
         columns: 3,
         widgets: [
-          kv("rates-inflation", "Rates & Inflation", [
-            ["Cash Rate", fmt(data.rates_environment?.rba_cash_rate, "%")],
-            ["AU 10Y Yield", fmt(data.rates_environment?.au_10y_bond_yield)],
-            ["Yield Curve", fmt(data.rates_environment?.yield_curve_slope)],
-            ["CPI YoY", fmt(data.inflation?.latest_cpi_yoy, "%")],
-            ["Trimmed Mean", fmt(data.inflation?.latest_trimmed_mean, "%")]
-          ], { description: "Monetary policy and inflation indicators." }),
-          kv("growth-china", "Growth & China", [
-            ["GDP YoY", fmt(data.growth?.gdp_growth_yoy, "%")],
-            ["Unemployment", fmt(data.growth?.unemployment_rate, "%")],
-            ["Shanghai YTD", fmt(data.china_exposure?.shanghai_comp_ytd, "%")],
-            ["Iron Ore YTD", fmt(data.china_exposure?.iron_ore_proxy_ytd, "%")],
-            ["AUD/CNY 3M", fmt(data.china_exposure?.aud_cny_3mo_change, "%")]
-          ], { description: "Domestic growth and China exposure proxies." }),
-          kv("risk-sectors", "Risk & Sectors", [
+          kv("rates-regime", "Rates Environment", [
+            ["Regime", data.rates_env?.regime],
+            ["RBA Cash Rate", fmt(data.rates_env?.rba_cash_rate, "%")],
+          ], { description: ratesDescription }),
+          
+          kv("vix-regime", "Volatility (VIX)", [
+            ["Risk Regime", data.risk_sentiment?.vix_regime],
             ["VIX Level", fmt(data.risk_sentiment?.vix_level)],
             ["ASX Vol 20D", fmt(data.risk_sentiment?.asx200_volatility_20d, "%")],
-            ["Outperforming", data.sector_rotation?.outperforming_sectors?.length || 0],
-            ["Underperforming", data.sector_rotation?.underperforming_sectors?.length || 0],
-            ["Rotation", data.sector_rotation?.rotation_signal || "MIXED"]
-          ], { description: "Market risk sentiment and sector rotation." })
+          ], { description: "VIX measures market fear. High VIX = High stress environment." }),
+
+          kv("china-drivers", "China Signal Components", [
+            ["Signal", data.china_exposure?.china_signal],
+            ["Shanghai YTD", fmt(data.china_exposure?.shanghai_comp_ytd, "%")],
+            ["AUD/CNY 3M", fmt(data.china_exposure?.aud_cny_3mo_change, "%")],
+            ["Iron Ore YTD", fmt(data.china_exposure?.iron_ore_proxy_ytd, "%")],
+          ], { description: "Aggregated signal from major Chinese economic proxies." })
         ]
       },
-      // Row 3: Risk Sentiment
+
+      // 3. ABS Economic Data — Structural indicators with fallback placeholders
+      kv("abs-data", "ABS Economic Indicators", [
+        ["CPI YoY (Inflation)", fmt(data.inflation?.latest_cpi_yoy, "%", "", "No data")],
+        ["GDP Growth YoY", fmt(data.growth?.gdp_growth_yoy, "%", "", "No data")],
+        ["Unemployment Rate", fmt(data.growth?.unemployment_rate, "%", "", "No data")],
+      ], { description: "Key domestic metrics from the Australian Bureau of Statistics." }),
+
+      // 4. Sector Rotation Signal Banner
       {
-        id: "risk-explanation",
-        type: "metric-explain",
-        label: "Risk Sentiment (VIX)",
-        value: fmt(data.risk_sentiment?.vix_level),
-        sentiment: "neutral",
-        description: `The VIX represents market expectations of near-term volatility. A level of ${fmt(data.risk_sentiment?.vix_level)} indicates a ${data.risk_sentiment?.vix_regime?.toLowerCase()} risk regime.`,
-        methodology: "VIX < 15 is LOW risk (complacency). 15-25 is NORMAL. 25-35 is ELEVATED (fear). > 35 is EXTREME (panic). Elevated VIX often precedes market bottoms, while persistently low VIX can precede corrections."
-      },
-      // Row 4: Trend Chart
+        id: "rotation-hero",
+        type: "banner",
+        text: `Sector Rotation Signal: ${data.sector_rotation?.rotation_signal || "MIXED"}`
+      }
+    ],
+    charts: [
+      // 5. 3-Month Normalized Trend Chart (Structural Evidence)
       ...(data.sector_rotation?.trend_datasets?.length > 0 ? [
         chart("sector-trend", "line", "3M Sector Trend vs ASX 200 (Base 100)", {
           labels: data.sector_rotation.trend_labels,
           datasets: data.sector_rotation.trend_datasets
-        }, { fullWidth: true, isChart: true })
-      ] : []),
-      // Row 5: Sector Rotation Factors
-      factors("sector-rotation-factors", "Sector Rotation Dynamics", [
-        ...(data.sector_rotation?.outperforming_sectors || []).map(s => ({
-          label: s,
-          value: "Outperforming",
-          sentiment: "bullish"
-        })),
-        ...(data.sector_rotation?.underperforming_sectors || []).map(s => ({
-          label: s,
-          value: "Underperforming",
-          sentiment: "bearish"
-        }))
-      ])
-    ],
-    charts: []
+        }, { fullWidth: true })
+      ] : [])
+    ]
   };
 }
 
@@ -283,7 +308,7 @@ function buildAnalysisCharts(data) {
           kv("macro-assessment", `Macro Assessment`, [
             ["Verdict",        data.macro_assessment?.overall],
             ["Risk Sentiment", data.macro_assessment?.risk_sentiment],
-            ["Rates Headwind", data.macro_assessment?.rates_headwind ? "Yes ⚠️" : "No ✅"],
+            ["Rates Headwind", data.macro_assessment?.rates_env?.regime === "RESTRICTIVE" ? "Yes ⚠️" : "No ✅"],
             ["China Tailwind", data.macro_assessment?.china_tailwind ? "Yes ✅" : "No"],
           ], { description: "Macro score (40% weight) — evaluates RBA rates regime, VIX risk environment, and China macro linkage." }),
         ]
@@ -315,6 +340,13 @@ function buildRecommendationCharts(data) {
   return {
     widgets: [
       { id: "execution-banner", type: "banner", text: "Execution View" },
+      
+      // Market Context — Pure data for background, hide qualitative badges
+      kv("market-context", "Market Context", [
+        ["ASX200 Level", fmt(data.market_context?.asx200_level)],
+        ["AUD/USD", fmt(data.market_context?.aud_usd)],
+      ], { description: "Broader market pulse at the time of recommendation.", hideBadges: true }),
+
       { id: "recommendation-hero", type: "hero", action: data.action, confidence: data.confidence, riskLevel: data.risk_level, horizon: data.time_horizon },
 
       // Conviction metrics row — each with a methodology explanation
@@ -391,11 +423,10 @@ function buildRecommendationCharts(data) {
   };
 }
 
-
 export function buildDashboard(tool, data) {
   if (tool === "get_technical_indicators") return buildStockCharts(data);
-  if (tool === "get_macro_info") return buildMacroInfoCharts(data);
-  if (tool === "get_macro_anchors") return buildMacroAnchorCharts(data);
+  if (tool === "get_market_snapshot") return buildMarketSnapshotCharts(data);
+  if (tool === "get_macro_regime") return buildMacroRegimeCharts(data);
   if (tool === "analyze_stock") return buildAnalysisCharts(data);
   if (tool === "recommend_stock") return buildRecommendationCharts(data);
   return { charts: [], widgets: [] };
