@@ -365,11 +365,38 @@ function renderBanner(widget) {
 }
 
 function renderHero(widget) {
-  const card = el("section", `widget hero ${widget.action || ""}`);
+  const sentiment = widget.action === "BUY" ? "bullish" : widget.action === "SELL" ? "bearish" : "neutral";
+  const card = el("section", `widget hero ${sentiment}`);
+  
   card.innerHTML = `
-    <div class="action">${widget.action || "HOLD"}</div>
-    <div style="font-weight: 600; opacity: 0.9;">${widget.confidence ?? "n/a"}% Confidence</div>
-    <div style="font-size: 13px; opacity: 0.8;">${widget.riskLevel || "n/a"} risk • ${widget.horizon || "n/a"} horizon</div>
+    <div class="hero-top">
+      <div class="hero-identity">
+        <span class="hero-symbol">${widget.symbol || ""}</span>
+        <h2 class="hero-name">${widget.companyName || "Recommendation Report"}</h2>
+      </div>
+      <div class="hero-price-block">
+        <span class="hero-price">${widget.price != null ? '$' + widget.price : "n/a"}</span>
+        <span class="hero-price-label">Current Quote</span>
+      </div>
+    </div>
+    
+    <div class="hero-verdict-row">
+      <div class="hero-action-badge ${sentiment}">${widget.action || "HOLD"}</div>
+      <div class="hero-conviction-block">
+        <div class="hero-stat">
+          <span class="hero-stat-label">Conviction</span>
+          <span class="hero-stat-value">${widget.confidence ?? "n/a"}%</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-label">Risk Profile</span>
+          <span class="hero-stat-value ${widget.riskLevel === 'HIGH' ? 'bearish' : widget.riskLevel === 'LOW' ? 'bullish' : 'neutral'}">${widget.riskLevel || "n/a"}</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-label">Horizon</span>
+          <span class="hero-stat-value">${widget.horizon || "n/a"}</span>
+        </div>
+      </div>
+    </div>
   `;
   return card;
 }

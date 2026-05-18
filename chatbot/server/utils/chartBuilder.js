@@ -409,20 +409,80 @@ function buildRecommendationCharts(data) {
 
   return {
     widgets: [
-      { id: "execution-banner", type: "banner", text: "Execution View" },
-      
-      // Market Context — Pure data for background, hide qualitative badges
-      kv("market-context", "Market Context", [
-        ["ASX200 Level", fmt(data.market_context?.asx200_level)],
-        ["AUD/USD", fmt(data.market_context?.aud_usd)],
-      ], { description: "Broader market pulse at the time of recommendation.", hideBadges: true }),
+      { id: "recommendation-banner", type: "banner", text: `Trade Recommendation: ${data.symbol || "Stock"}` },
 
-      { id: "recommendation-hero", type: "hero", action: data.action, confidence: data.confidence, riskLevel: data.risk_level, horizon: data.time_horizon },
-
-      // Conviction metrics row — each with a methodology explanation
+      // 1. Core Hero — The Verdict
       {
-        id: "conviction-group",
+        id: "recommendation-hero",
+        type: "hero",
+        symbol: data.symbol,
+        companyName: data.company_name,
+        price: pg.current_price,
+        action: data.action,
+        confidence: data.confidence,
+        riskLevel: data.risk_level,
+        horizon: data.time_horizon
+      },
+
+      // 2. Analyst Narrative — Immediate context after the verdict
+      ...(data.narrative ? [{
+        id: "research-narrative",
+        type: "text",
+        title: "Research Rationale",
+        text: data.narrative
+      }] : []),
+
+      // 3. Trade Planning — Data side-by-side
+      {
+        id: "trade-planning-group",
         type: "group",
+        title: "Trade Execution & Risk Profile",
+        fullWidth: true,
+        columns: 2,
+        widgets: [
+          {
+            id: "price-levels",
+            type: "price-plan",
+            title: "Trade Execution Levels",
+            description: "Derived from technical resistance/support and ATR-based protection.",
+            rows: [
+              { label: entryLabel, value: entryRange, note: "Target entry window." },
+              { label: "Stop Loss", value: fmt(pg.stop_loss, "", "$"), note: "Exit immediately if breached." },
+              { label: "Target Price", value: fmt(pg.target_price, "", "$"), note: "Projected exit level." },
+            ]
+          },
+          {
+            id: "risk-reward-explain",
+            type: "price-plan",
+            title: "Return & Risk Profile",
+            description: "Efficiency of potential gains versus identified risk.",
+            rows: [
+              { label: "Potential Upside", value: upside !== null ? `+${upside}%` : "n/a", note: "Max gain if target reached." },
+              { label: "Downside Risk", value: downside !== null ? `-${downside}%` : "n/a", note: "Max loss if stop triggered." },
+              { label: "Risk / Reward", value: rr ? `1 : ${rr}` : "n/a", note: `Efficiency: ${rr ?? "n/a"}x potential.` },
+            ]
+          }
+        ]
+      },
+
+      // 4. Drivers & Risks — Comparative view
+      {
+        id: "drivers-risks-group",
+        type: "group",
+        fullWidth: true,
+        columns: 2,
+        widgets: [
+          factors("key-reasons", "✅ Conviction Drivers", data.key_reasons),
+          factors("key-risks", "🔴 Critical Risks", data.key_risks),
+        ]
+      },
+
+      // 5. Conviction Methodology — 3 columns
+      {
+        id: "methodology-group",
+        type: "group",
+        title: "Quantitative Assessment",
+        fullWidth: true,
         columns: 3,
         widgets: [
           {
@@ -431,7 +491,7 @@ function buildRecommendationCharts(data) {
             label: "Confidence",
             value: `${data.confidence ?? "n/a"}%`,
             sentiment: (data.confidence ?? 0) >= 70 ? "bullish" : (data.confidence ?? 0) >= 50 ? "neutral" : "bearish",
-            methodology: "Derived from the Combined Score magnitude across 5 bands. Score ≥ 40: 60–100% confidence BUY. Score 15–39: 50–59% confidence BUY. Score −14 to +14: 40–50% HOLD. Score −15 to −39: 50–59% confidence SELL. Score ≤ −40: 60–100% confidence SELL.",
+            methodology: "Derived from the Combined Score magnitude across 5 standardized confidence bands.",
           },
           {
             id: "risk-explain",
@@ -439,7 +499,7 @@ function buildRecommendationCharts(data) {
             label: "Risk Level",
             value: data.risk_level ?? "n/a",
             sentiment: data.risk_level === "LOW" ? "bullish" : data.risk_level === "HIGH" ? "bearish" : "neutral",
-            methodology: "HIGH if |Combined Score| < 15 or ≥ 4 bearish signals present. MEDIUM if |Combined Score| < 40 or ≥ 2 bearish signals. LOW only when |score| ≥ 40 and fewer than 2 bearish signals.",
+            methodology: "Based on total bearish count and magnitude of directional score.",
           },
           {
             id: "score-explain",
@@ -447,48 +507,17 @@ function buildRecommendationCharts(data) {
             label: "Combined Score",
             value: scores.combined_score !== undefined ? (scores.combined_score > 0 ? `+${scores.combined_score}` : String(scores.combined_score)) : "n/a",
             sentiment: (scores.combined_score ?? 0) >= 15 ? "bullish" : (scores.combined_score ?? 0) <= -15 ? "bearish" : "neutral",
-            methodology: "Weighted sum: Technical Score × 60% + Macro Score × 40%. Ranges: ≥ 40 → Strong BUY, 15–39 → Mild BUY, −14 to +14 → HOLD, −15 to −39 → Mild SELL, ≤ −40 → Strong SELL. Each band maps continuously with no gaps.",
+            methodology: "Weighted sum: Technical Score (60%) + Macro Score (40%).",
           }
         ]
       },
 
-      // Price levels and R/R side-by-side
-      {
-        id: "trade-plan-group",
-        type: "group",
-        columns: 2,
-        widgets: [
-          {
-            id: "price-levels",
-            type: "price-plan",
-            title: "Trade Price Levels",
-            description: "Prices are derived from 52-week high/low range and an 8% ATR-based stop loss rule.",
-            rows: [
-              { label: "Current Price", value: fmt(pg.current_price, "", "$"), note: "Estimated by reversing: Stop Loss ÷ 0.92 (since stop = current × 0.92)." },
-              { label: entryLabel, value: entryRange, note: data.action === "BUY" ? "−2% to +0.5% of current price: patient entry on a slight pullback." : data.action === "SELL" ? "−0.5% to +2%: sell into a bounce for a better average price." : "±1% around current price — no directional edge detected." },
-              { label: "Stop Loss", value: fmt(pg.stop_loss, "", "$"), note: "Set at 8% below current price. Exit immediately if this level is breached to cap losses." },
-              { label: "Target Price", value: fmt(pg.target_price, "", "$"), note: data.action === "BUY" ? "52-week resistance level, or +15% if no resistance is available." : data.action === "SELL" ? "52-week support, or −12% if no support data." : "No directional target — hold at current levels." },
-            ]
-          },
-          {
-            id: "risk-reward-explain",
-            type: "price-plan",
-            title: "Risk / Reward Profile",
-            description: "How much you could gain versus how much you could lose per dollar risked.",
-            rows: [
-              { label: "Potential Upside", value: upside !== null ? `+${upside}%` : "n/a", note: "(Target − Current) ÷ Current × 100. The maximum gain if target is reached." },
-              { label: "Downside Risk", value: downside !== null ? `-${downside}%` : "n/a", note: "(Current − Stop Loss) ÷ Current × 100. The maximum loss if stop loss is triggered." },
-              { label: "Risk / Reward Ratio", value: rr ? `1 : ${rr}` : "n/a", note: `For every 1% at risk, the potential reward is ${rr ?? "n/a"}%. Ratios ≥ 1:2 are considered acceptable; ≥ 1:3 is excellent.` },
-              { label: "Time Horizon", value: data.time_horizon ?? "n/a", note: "MEDIUM = 1–6 months based on trend signals. SHORT = days to weeks for tactical setups." },
-            ]
-          }
-        ]
-      },
-
-      factors("key-reasons", "✅ Why This Recommendation", data.key_reasons),
-      factors("key-risks", "🔴 Key Risks to Monitor", data.key_risks),
-      data.narrative ? { id: "recommendation-text", type: "text", title: "Analyst Narrative", text: data.narrative } : null
-    ].filter(Boolean),
+      // 6. Market Backdrop
+      kv("market-context", "Market Context", [
+        ["ASX200 Level", fmt(data.market_context?.asx200_level)],
+        ["AUD/USD", fmt(data.market_context?.aud_usd)],
+      ], { description: "Broader market pulse at the time of recommendation.", hideBadges: true }),
+    ],
     charts: []
   };
 }
