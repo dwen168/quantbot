@@ -389,8 +389,8 @@ function renderStockHero(widget) {
   const changeClass = changeUp ? "bullish" : "bearish";
   const changeLabel = isNaN(change) ? "n/a" : `${changeArrow} ${Math.abs(change).toFixed(2)}%`;
 
-  const volRatio = widget.volumeRatio != null ? parseFloat(widget.volumeRatio).toFixed(2) : "n/a";
-  const volNote = parseFloat(volRatio) > 1.5 ? "high" : parseFloat(volRatio) < 0.7 ? "low" : "normal";
+  const volRatio = widget.volumeRatio != null ? parseFloat(widget.volumeRatio).toFixed(2) : null;
+  const volNote = volRatio ? (parseFloat(volRatio) > 1.5 ? "high" : parseFloat(volRatio) < 0.7 ? "low" : "normal") : "";
 
   const card = el("section", `widget ${widget.fullWidth ? "full-width" : ""} stock-hero-card ${widget.trend ? trendSentiment : changeClass}`);
   
@@ -401,6 +401,13 @@ function renderStockHero(widget) {
   const trendNoteHtml = widget.trend
     ? `<span class="stock-hero-trend-note">Current Technical Trend</span>`
     : "";
+
+  const volHtml = volRatio ? `
+    <div class="stock-hero-stat">
+      <span class="stock-stat-label">Volume Ratio</span>
+      <span class="stock-stat-value neutral">×${volRatio} <em>(${volNote})</em></span>
+    </div>
+  ` : "";
 
   card.innerHTML = `
     <div class="stock-hero-left">
@@ -416,10 +423,7 @@ function renderStockHero(widget) {
           <span class="stock-stat-label">${widget.trend ? '2Y Period Change' : 'Today\'s Change'}</span>
           <span class="stock-stat-value ${changeClass}">${changeLabel}</span>
         </div>
-        <div class="stock-hero-stat">
-          <span class="stock-stat-label">Volume Ratio</span>
-          <span class="stock-stat-value neutral">×${volRatio} <em>(${volNote})</em></span>
-        </div>
+        ${volHtml}
       </div>
     </div>
   `;
