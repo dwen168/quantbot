@@ -51,6 +51,10 @@ function templateMessage(tool, data) {
   return "I found data, but could not format a response for that tool.";
 }
 
+function sendSSE(res, data) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
 async function maybeSummarize({ tool, data, model }) {
   const base = templateMessage(tool, data);
   const summary = await generateChatSummary({
@@ -62,95 +66,131 @@ async function maybeSummarize({ tool, data, model }) {
 
 router.post("/", async (req, res) => {
   const { message, model } = req.body || {};
+  
+  // Set headers for SSE
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive"
+  });
+
   if (!message || typeof message !== "string") {
-    return res.status(400).json({ error: "Message is required.", code: "MESSAGE_REQUIRED" });
-  }
-
-  const routed = await routeIntent(message);
-
-  if (routed.intent === "INVALID_TICKER") {
-    return res.status(400).json({
-      error: `The ticker "${routed.params?.ticker}" does not appear to be a valid ASX stock. Please check the symbol and try again.`,
-      code: "INVALID_TICKER"
-    });
-  }
-
-  const tool = toolForIntent(routed.intent);
-  if (!tool) {
-    let fallbackMessage = null;
-    try {
-      if (process.env.OPENAI_API_KEY) {
-        const { default: OpenAI } = await import("openai");
-        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const completion = await client.chat.completions.create({
-          model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-          messages: [
-            { role: "system", content: "You are QuantBot, an AI assistant for Australian market analysis. The user asked a general question. Answer it helpfully and concisely in markdown." },
-            { role: "user", content: message }
-          ]
-        });
-        fallbackMessage = completion.choices[0]?.message?.content;
-      } else {
-        fallbackMessage = await generateChatSummary({
-          model,
-          prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
-        });
-      }
-    } catch (e) {
-      console.error("Fallback LLM failed:", e);
-    }
-    
-    if (fallbackMessage) {
-      return res.json({ message: fallbackMessage, tool: null, params: {}, rawData: null, charts: [], widgets: [] });
-    }
-
-    return res.status(400).json({
-      error: "Could not resolve ticker or intent from your message. Try an ASX ticker such as BHP, CBA, RIO, or ask about macro conditions.",
-      code: "INTENT_NOT_FOUND"
-    });
-  }
-
-  if (["get_technical_indicators", "analyze_stock", "recommend_stock"].includes(tool) && !routed.params?.ticker) {
-    return res.status(400).json({
-      error: "Could not resolve ticker from your message. Please include an ASX ticker (e.g. BHP, CBA).",
-      code: "TICKER_NOT_FOUND"
-    });
+    sendSSE(res, { type: "error", error: "Message is required.", code: "MESSAGE_REQUIRED" });
+    return res.end();
   }
 
   try {
+    sendSSE(res, { type: "progress", pct: 15, message: "Identifying intent and ticker..." });
+    const routed = await routeIntent(message);
+
+    if (routed.intent === "INVALID_TICKER") {
+      sendSSE(res, {
+        type: "error",
+        error: `The ticker "${routed.params?.ticker}" does not appear to be a valid ASX stock. Please check the symbol and try again.`,
+        code: "INVALID_TICKER"
+      });
+      return res.end();
+    }
+
+    const tool = toolForIntent(routed.intent);
+    if (!tool) {
+      sendSSE(res, { type: "progress", pct: 50, message: "Thinking about your question..." });
+      let fallbackMessage = null;
+      try {
+        if (process.env.OPENAI_API_KEY) {
+          const { default: OpenAI } = await import("openai");
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const completion = await client.chat.completions.create({
+            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are QuantBot, an AI assistant for Australian market analysis. The user asked a general question. Answer it helpfully and concisely in markdown." },
+              { role: "user", content: message }
+            ]
+          });
+          fallbackMessage = completion.choices[0]?.message?.content;
+        } else {
+          fallbackMessage = await generateChatSummary({
+            model,
+            prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
+          });
+        }
+      } catch (e) {
+        console.error("Fallback LLM failed:", e);
+      }
+      
+      if (fallbackMessage) {
+        sendSSE(res, { 
+          type: "complete", 
+          payload: { message: fallbackMessage, tool: null, params: {}, rawData: null, charts: [], widgets: [] } 
+        });
+        return res.end();
+      }
+
+      sendSSE(res, {
+        type: "error",
+        error: "Could not resolve ticker or intent from your message. Try an ASX ticker such as BHP, CBA, RIO, or ask about macro conditions.",
+        code: "INTENT_NOT_FOUND"
+      });
+      return res.end();
+    }
+
+    if (["get_technical_indicators", "analyze_stock", "recommend_stock"].includes(tool) && !routed.params?.ticker) {
+      sendSSE(res, {
+        type: "error",
+        error: "Could not resolve ticker from your message. Please include an ASX ticker (e.g. BHP, CBA).",
+        code: "TICKER_NOT_FOUND"
+      });
+      return res.end();
+    }
+
+    sendSSE(res, { type: "progress", pct: 40, message: `Requesting ${tool.replace(/_/g, " ")} data...` });
     const params = { ...routed.params };
     if (tool === "get_technical_indicators" && !params.period) {
       params.period = "2y";
     }
     const rawData = await callTool(tool, params);
 
-    // Check if the data returned contains an error from yfinance (common in this project's pattern)
+    // Check if the data returned contains an error from yfinance
     if (rawData && (rawData.error || (rawData.symbol && !rawData.last_price && !rawData.price_series?.length))) {
       const errorMsg = rawData.error || "";
       if (errorMsg.includes("No OHLCV data") || errorMsg.includes("not found") || errorMsg.includes("Ticker is required")) {
-        return res.status(404).json({
+        sendSSE(res, {
+          type: "error",
           error: `I couldn't find any data for "${params.ticker}". It may not be listed on the ASX or the ticker symbol is incorrect.`,
           code: "TICKER_NOT_FOUND_ON_ASX"
         });
+        return res.end();
       }
     }
 
+    sendSSE(res, { type: "progress", pct: 70, message: "Generating charts and analysis..." });
     const { charts, widgets } = buildDashboard(tool, rawData);
+    
+    sendSSE(res, { type: "progress", pct: 90, message: "Finalizing AI summary..." });
     const responseMessage = await maybeSummarize({ tool, data: rawData, model });
-    return res.json({ message: responseMessage, tool, params, rawData, charts, widgets });
+    
+    sendSSE(res, { 
+      type: "complete", 
+      payload: { message: responseMessage, tool, params, rawData, charts, widgets } 
+    });
+    res.end();
   } catch (error) {
+    console.error("Chat route error:", error);
     const errorMsg = error.message || "";
     if (errorMsg.includes("No OHLCV data") || errorMsg.includes("not found")) {
-      return res.status(404).json({
-        error: `The stock "${routed.params?.ticker}" was not found on the ASX. Please verify the ticker symbol.`,
+      sendSSE(res, {
+        type: "error",
+        error: `The stock "${message}" was not found on the ASX. Please verify the ticker symbol.`,
         code: "TICKER_NOT_FOUND_ON_ASX"
       });
+    } else {
+      sendSSE(res, {
+        type: "error",
+        error: error.message || "An unexpected error occurred.",
+        code: "INTERNAL_ERROR"
+      });
     }
-
-    return res.status(502).json({
-      error: error.message || "MCP tool call failed.",
-      code: "MCP_TOOL_FAILED"
-    });
+    res.end();
   }
 });
 

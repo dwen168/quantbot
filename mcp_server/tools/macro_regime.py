@@ -102,11 +102,12 @@ def get_macro_regime() -> MacroRegime:
                 df = df.dropna(subset=["Close"])
                 if not df.empty:
                     base_price = df["Close"].iloc[0]
-                    normalized = (df["Close"] / base_price * 100).round(2)
+                    # Calculate cumulative percentage change from the start of the period
+                    cumulative_pct = ((df["Close"] - base_price) / base_price * 100).round(2)
                     if not trend_labels:
                         trend_labels = [d.strftime("%Y-%m-%d") for d in df.index]
                     trend_datasets.append({
-                        "label": name, "data": normalized.tolist(), 
+                        "label": name, "data": cumulative_pct.tolist(), 
                         "borderColor": colors.get(name, "#999999"), "borderWidth": 2, "pointRadius": 0, "tension": 0.3
                     })
     except Exception as e:

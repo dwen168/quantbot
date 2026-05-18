@@ -238,9 +238,23 @@ function buildMacroRegimeCharts(data) {
     ? "Rates are low to support economic growth and investment."
     : "Rates are at a neutral level, neither strongly restricting nor stimulating the economy.";
 
+  const rotation = data.sector_rotation?.rotation_signal || "MIXED";
+  const rotationExplanation = rotation === "RISK_OFF" 
+    ? "⚠️ RISK_OFF: Defensive sectors outperforming. High market fear/uncertainty."
+    : rotation === "RISK_ON"
+    ? "✅ RISK_ON: Growth/Cyclical sectors outperforming. Market is seeking higher yields."
+    : "⚖️ MIXED: No clear defensive or growth leadership.";
+
   return {
     widgets: [
-      // 1. Macro Hero — Badge text is the core content
+      // 1. Sector Rotation Signal Banner - Move to TOP
+      {
+        id: "rotation-hero",
+        type: "banner",
+        text: `Rotation Signal: ${rotationExplanation}`
+      },
+
+      // 2. Macro Hero — Badge text is the core content
       {
         id: "macro-hero",
         type: "macro-hero",
@@ -250,7 +264,7 @@ function buildMacroRegimeCharts(data) {
         summary: data.summary || "Structural macro environment overview."
       },
 
-      // 2. Structural Drivers Group
+      // 3. Structural Drivers Group
       {
         id: "regime-drivers",
         type: "group",
@@ -276,24 +290,17 @@ function buildMacroRegimeCharts(data) {
         ]
       },
 
-      // 3. ABS Economic Data — Structural indicators with fallback placeholders
+      // 4. ABS Economic Data — Structural indicators with fallback placeholders
       kv("abs-data", "ABS Economic Indicators", [
         ["CPI YoY (Inflation)", fmt(data.inflation?.latest_cpi_yoy, "%", "", "No data")],
         ["GDP Growth YoY", fmt(data.growth?.gdp_growth_yoy, "%", "", "No data")],
         ["Unemployment Rate", fmt(data.growth?.unemployment_rate, "%", "", "No data")],
       ], { description: "Key domestic metrics from the Australian Bureau of Statistics." }),
-
-      // 4. Sector Rotation Signal Banner
-      {
-        id: "rotation-hero",
-        type: "banner",
-        text: `Sector Rotation Signal: ${data.sector_rotation?.rotation_signal || "MIXED"}`
-      }
     ],
     charts: [
-      // 5. 3-Month Normalized Trend Chart (Structural Evidence)
+      // 5. 3-Month Cumulative Trend Chart
       ...(data.sector_rotation?.trend_datasets?.length > 0 ? [
-        chart("sector-trend", "line", "3M Sector Trend vs ASX 200 (Base 100)", {
+        chart("sector-trend", "line", "3M Sector Trend vs ASX 200 (Cumulative % Change)", {
           labels: data.sector_rotation.trend_labels,
           datasets: data.sector_rotation.trend_datasets
         }, { fullWidth: true })

@@ -69,14 +69,21 @@ async function loadModels() {
   try {
     const response = await fetch("/api/models");
     const data = await response.json();
+    const defaultModel = data.defaultModel || "gemma4:e4b";
+    
+    // Clear existing (except default) if needed, but here we just append
+    select.innerHTML = "";
+    
     for (const model of data.models || []) {
       const option = document.createElement("option");
       option.value = model;
-      option.textContent = model;
+      const isDefault = model === defaultModel;
+      option.textContent = isDefault ? `${model} (Default)` : model;
       select.append(option);
     }
-    if ((data.models || []).includes("gemma4:e4b")) {
-      select.value = "gemma4:e4b";
+    
+    if ((data.models || []).includes(defaultModel)) {
+      select.value = defaultModel;
     }
   } catch {
     select.title = "Could not load local Ollama models";
@@ -89,6 +96,17 @@ export function initChat() {
   const form = document.getElementById("chat-form");
   const input = document.getElementById("chat-input");
   const modelSelect = document.getElementById("model-select");
+
+  // Make capability examples clickable
+  document.querySelectorAll(".cap-item code").forEach(el => {
+    el.style.cursor = "pointer";
+    el.title = "Click to try this prompt";
+    el.addEventListener("click", () => {
+      const prompt = el.textContent.replace(/^"|"$/g, "");
+      input.value = prompt;
+      form.dispatchEvent(new Event("submit"));
+    });
+  });
 
   // Clear dashboard button
   const clearBtn = document.getElementById("clear-dashboard-btn");
@@ -108,14 +126,18 @@ export function initChat() {
     appendMessage("user", markdown(message));
     history.push({ role: "user", content: message });
     
-    // Professional Thinking/Typing Indicator
+    // Professional Progress Indicator
     const typingHtml = `
-      <span class="thinking-text">QuantBot is thinking</span>
-      <div class="typing-indicator">
-        <span></span><span></span><span></span>
+      <div class="progress-container">
+        <div class="progress-label">QuantBot is initializing...</div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" style="width: 5%"></div>
+        </div>
       </div>
     `;
     const typing = appendMessage("assistant", typingHtml);
+    const progressLabel = typing.querySelector(".progress-label");
+    const progressFill  = typing.querySelector(".progress-bar-fill");
 
     try {
       const response = await fetch("/api/chat", {
@@ -127,23 +149,62 @@ export function initChat() {
           model: modelSelect.value || undefined
         })
       });
-      const data = await response.json();
-      typing.remove();
+
       if (!response.ok) {
+        // SSE might not have started yet, handle immediate error
+        const data = await response.json().catch(() => ({}));
+        typing.remove();
         appendMessage("assistant", markdown(`**Error:** ${data.error || "Request failed."}`));
         return;
       }
 
-      // Only assign a session if there is real dashboard content
-      const hasDashboard = (data.charts?.length > 0) || (data.widgets?.length > 0);
-      const sessionId = hasDashboard ? (++sessionIdCounter) : undefined;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      appendMessage("assistant", markdown(data.message), data.tool, sessionId);
-      history.push({ role: "assistant", content: data.message });
-      while (history.length > 20) history.shift();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
 
-      if (hasDashboard) {
-        renderDashboard(data, sessionId);
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data: ")) continue;
+
+          try {
+            const data = JSON.parse(line.slice(6));
+            
+            if (data.type === "progress") {
+              if (progressLabel) progressLabel.textContent = data.message;
+              if (progressFill)  progressFill.style.width = `${data.pct}%`;
+            } 
+            else if (data.type === "complete") {
+              const payload = data.payload;
+              typing.remove();
+
+              // Only assign a session if there is real dashboard content
+              const hasDashboard = (payload.charts?.length > 0) || (payload.widgets?.length > 0);
+              const sessionId = hasDashboard ? (++sessionIdCounter) : undefined;
+
+              appendMessage("assistant", markdown(payload.message), payload.tool, sessionId);
+              history.push({ role: "assistant", content: payload.message });
+              while (history.length > 20) history.shift();
+
+              if (hasDashboard) {
+                renderDashboard(payload, sessionId);
+              }
+            }
+            else if (data.type === "error") {
+              typing.remove();
+              appendMessage("assistant", markdown(`**Error:** ${data.error || "Request failed."}`));
+            }
+          } catch (e) {
+            console.error("Error parsing SSE chunk", e);
+          }
+        }
       }
     } catch (error) {
       typing.remove();
