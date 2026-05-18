@@ -477,7 +477,16 @@ function buildRecommendationCharts(data) {
         ]
       },
 
-      // 5. Conviction Methodology — 3 columns
+      // 5. Market Context — Repositioned above assessment
+      kv("market-context", "Market Context & Impact", [
+        ["ASX200 Level",  fmt(data.market_context?.asx200_level)],
+        ["AUD/USD",       fmt(data.market_context?.aud_usd)],
+        ["VIX (Risk)",    fmt(data.market_context?.vix_level),   "", (data.market_context?.vix_level > 20 ? " (Headwind)" : " (Tailwind)")],
+        ["RBA Cash Rate", fmt(data.market_context?.rba_cash_rate, "%"), "", (data.market_context?.rba_cash_rate >= 4 ? " (Headwind)" : " (Tailwind)")],
+        ["Iron Ore",      fmt(data.market_context?.iron_ore_price, "", "$"), "", (data.market_context?.iron_ore_price > 100 ? " (Tailwind)" : " (Neutral)")],
+      ], { description: "Macro environment metrics and their directional impact on the score.", hideBadges: true }),
+
+      // 6. Conviction Methodology — 3 columns
       {
         id: "methodology-group",
         type: "group",
@@ -511,15 +520,6 @@ function buildRecommendationCharts(data) {
           }
         ]
       },
-
-      // 6. Market Backdrop
-      kv("market-context", "Market Context", [
-        ["ASX200 Level",  fmt(data.market_context?.asx200_level)],
-        ["AUD/USD",       fmt(data.market_context?.aud_usd)],
-        ["VIX (Risk)",    fmt(data.market_context?.vix_level)],
-        ["RBA Cash Rate", fmt(data.market_context?.rba_cash_rate, "%")],
-        ["Iron Ore",      fmt(data.market_context?.iron_ore_price, "", "$")],
-      ], { description: "Broader market pulse at the time of recommendation.", hideBadges: true }),
     ],
     charts: []
   };
