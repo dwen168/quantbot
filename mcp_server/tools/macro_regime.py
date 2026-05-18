@@ -44,10 +44,12 @@ def _vix_regime(vix: float | None) -> str:
     return "EXTREME"
 
 
+from mcp_server.analysis.llm_narrative import generate_narrative
+
 def get_macro_regime() -> MacroRegime:
     """
     Step 4: New analysis-oriented tool.
-    Focuses on 'What is the underlying economic environment?'
+    Focuses on 'What is underlying economic environment?'
     Used for scoring and deep context.
     """
     core = fetch_macro_core()
@@ -90,7 +92,7 @@ def get_macro_regime() -> MacroRegime:
     elif {"Property", "Broad Market"}.intersection(underperformers) or vix_regime_str in {"ELEVATED", "EXTREME"}:
         rotation = "RISK_OFF"
 
-    # Fetch 3-month series for sector trend chart (contextual supporting data)
+    # Fetch 3-month series for sector trend chart
     trend_labels = []
     trend_datasets = []
     try:
@@ -102,7 +104,6 @@ def get_macro_regime() -> MacroRegime:
                 df = df.dropna(subset=["Close"])
                 if not df.empty:
                     base_price = df["Close"].iloc[0]
-                    # Calculate cumulative percentage change from the start of the period
                     cumulative_pct = ((df["Close"] - base_price) / base_price * 100).round(2)
                     if not trend_labels:
                         trend_labels = [d.strftime("%Y-%m-%d") for d in df.index]
@@ -113,7 +114,34 @@ def get_macro_regime() -> MacroRegime:
     except Exception as e:
         errors.append(f"Failed to fetch sector trend data: {e}")
 
-    summary = f"Rates look {regime.lower()}, China signal is {china_signal.lower()}, and risk sentiment is {vix_regime_str.lower()}."
+    # 6. Geopolitical Context & LLM Summary
+    news_text = "\n".join([f"- {n.title}" for n in core.news_headlines])
+    prompt = (
+        f"Analyze the current Australian macro regime based on these inputs:\n"
+        f"- RBA Cash Rate: {cash_rate}% ({regime})\n"
+        f"- China Signal: {china_signal}\n"
+        f"- Risk Sentiment (VIX): {vix} ({vix_regime_str})\n"
+        f"- Commodities: Gold {core.commodities.get('gold')}, Oil {core.commodities.get('oil')}\n"
+        f"- Recent Headlines: {news_text}\n\n"
+        f"Task:\n"
+        f"1. Provide a 2-sentence structural macro summary.\n"
+        f"2. Provide a 1-sentence assessment of GEOPOLITICAL RISK if relevant (wars, trade issues). If none, say 'No significant geopolitical escalation detected.'\n"
+        f"Format: Separate the two sections with a [GEO] delimiter."
+    )
+    llm_output = generate_narrative(prompt)
+    
+    if llm_output:
+        if "[GEO]" in llm_output:
+            parts = llm_output.split("[GEO]")
+            summary = parts[0].strip()
+            geopolitics = parts[1].strip()
+        else:
+            # Fallback for unexpected format
+            summary = llm_output.strip()
+            geopolitics = "Geopolitical assessment integrated into summary or no significant escalation detected."
+    else:
+        summary = f"Rates look {regime.lower()}, China signal is {china_signal.lower()}, and risk sentiment is {vix_regime_str.lower()}."
+        geopolitics = "Geopolitical context unavailable (LLM connection timeout or offline)."
 
     return MacroRegime(
         as_of_date=date.today().isoformat(),
@@ -152,6 +180,8 @@ def get_macro_regime() -> MacroRegime:
         ),
         commodities=core.commodities,
         global_indices_1d=core.global_indices_1d,
+        news_headlines=core.news_headlines,
+        geopolitical_context=geopolitics,
         summary=summary,
         errors=errors,
     )

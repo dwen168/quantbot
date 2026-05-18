@@ -385,7 +385,7 @@ function renderHero(widget) {
       <div class="hero-conviction-block">
         <div class="hero-stat">
           <span class="hero-stat-label">Conviction</span>
-          <span class="hero-stat-value">${widget.confidence ?? "n/a"}%</span>
+          <span class="hero-stat-value">${widget.conviction ?? "n/a"}%</span>
         </div>
         <div class="hero-stat">
           <span class="hero-stat-label">Risk Profile</span>
@@ -475,10 +475,18 @@ function renderMacroHero(widget) {
     return "bearish"; // ELEVATED or EXTREME
   };
 
+  const geoHtml = widget.geopolitics ? `
+    <div class="macro-hero-geopolitics">
+      <span class="geo-label">🌍 Geopolitical Assessment</span>
+      <p class="geo-text">${widget.geopolitics}</p>
+    </div>
+  ` : "";
+
   card.innerHTML = `
     <div class="macro-hero-header">
       <h3 class="macro-hero-title">Macro Anchors Snapshot</h3>
       <p class="macro-hero-summary">${widget.summary || ""}</p>
+      ${geoHtml}
     </div>
     <div class="macro-hero-badges">
       <div class="macro-badge">

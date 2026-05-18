@@ -77,7 +77,7 @@ class Recommendation(BaseModel):
     company_name: str
     recommendation_date: str
     action: str
-    confidence: int
+    conviction: int
     time_horizon: str
     risk_level: str
     price_guidance: PriceGuidance

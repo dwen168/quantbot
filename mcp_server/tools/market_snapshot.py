@@ -64,43 +64,6 @@ def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
         return None
 
 
-def _news_items() -> list[NewsItem]:
-    items: list[NewsItem] = []
-    # Mix of ASX local, Global Indices, and Commodities to catch Geopolitics (e.g. Oil/Gold/VIX)
-    ticker_map = {
-        "^AXJO": "Market",
-        "CL=F": "Energy",
-        "GC=F": "Metals",
-        "^GSPC": "Macro",
-        "^VIX": "Risk"
-    }
-    for ticker, category in ticker_map.items():
-        for item in get_news(ticker, 5):
-            published = item.get("providerPublishTime") or item.get("pubDate")
-            if isinstance(published, int):
-                published = datetime.fromtimestamp(published, tz=timezone.utc).isoformat()
-            content = item.get("content") if isinstance(item.get("content"), dict) else {}
-            title = item.get("title") or content.get("title")
-            url = item.get("link") or item.get("url") or content.get("canonicalUrl", {}).get("url")
-            publisher = item.get("publisher") or content.get("provider", {}).get("displayName")
-            if title:
-                items.append(NewsItem(
-                    title=title, 
-                    publisher=publisher, 
-                    published=published, 
-                    url=url, 
-                    related_ticker=ticker,
-                    category=category
-                ))
-    seen: set[str] = set()
-    unique: list[NewsItem] = []
-    for item in items:
-        if item.title not in seen:
-            seen.add(item.title)
-            unique.append(item)
-    return unique[:10]
-
-
 def get_market_snapshot() -> MarketSnapshot:
     """
     Step 4: New display-oriented tool.
@@ -160,6 +123,6 @@ def get_market_snapshot() -> MarketSnapshot:
             shanghai_series=_history("000001.SS", "3mo"),
             hang_seng_series=_history("^HSI", "3mo"),
         ),
-        news_headlines=_news_items(),
+        news_headlines=core.news_headlines,
         errors=errors,
     )

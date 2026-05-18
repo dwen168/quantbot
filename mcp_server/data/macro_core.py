@@ -1,12 +1,12 @@
-from __future__ import annotations
-
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
 from mcp_server.data.rba_client import get_cash_rate
-from mcp_server.data.yfinance_client import get_ohlcv
+from mcp_server.data.yfinance_client import get_ohlcv, get_news
+from mcp_server.models.macro import NewsItem
 
 SECTOR_PROXIES = {
     "VAS.AX": "Broad Market",
@@ -27,6 +27,7 @@ class MacroCore:
     raw_rba: dict[str, Any]
     commodities: dict[str, float | None]
     global_indices_1d: dict[str, float | None]
+    news_headlines: list[NewsItem]
 
 
 def _clean(value):
@@ -55,6 +56,43 @@ def _last_close(ticker: str, period: str = "1mo") -> float | None:
         return _clean(close.iloc[-1]) if not close.empty else None
     except Exception:
         return None
+
+
+def _fetch_news() -> list[NewsItem]:
+    items: list[NewsItem] = []
+    # Mix of ASX local, Global Indices, and Commodities to catch Geopolitics (e.g. Oil/Gold/VIX)
+    ticker_map = {
+        "^AXJO": "Market",
+        "CL=F": "Energy",
+        "GC=F": "Metals",
+        "^GSPC": "Macro",
+        "^VIX": "Risk"
+    }
+    for ticker, category in ticker_map.items():
+        for item in get_news(ticker, 5):
+            published = item.get("providerPublishTime") or item.get("pubDate")
+            if isinstance(published, int):
+                published = datetime.fromtimestamp(published, tz=timezone.utc).isoformat()
+            content = item.get("content") if isinstance(item.get("content"), dict) else {}
+            title = item.get("title") or content.get("title")
+            url = item.get("link") or item.get("url") or content.get("canonicalUrl", {}).get("url")
+            publisher = item.get("publisher") or content.get("provider", {}).get("displayName")
+            if title:
+                items.append(NewsItem(
+                    title=title, 
+                    publisher=publisher, 
+                    published=published, 
+                    url=url, 
+                    related_ticker=ticker,
+                    category=category
+                ))
+    seen: set[str] = set()
+    unique: list[NewsItem] = []
+    for item in items:
+        if item.title not in seen:
+            seen.add(item.title)
+            unique.append(item)
+    return unique[:15]
 
 
 def fetch_macro_core() -> MacroCore:
@@ -95,6 +133,9 @@ def fetch_macro_core() -> MacroCore:
         "shanghai": _pct_change("000001.SS", "5d", days=2)
     }
 
+    # 7. News
+    news = _fetch_news()
+
     return MacroCore(
         cash_rate=cash_rate,
         vix=vix,
@@ -104,5 +145,6 @@ def fetch_macro_core() -> MacroCore:
         sector_changes=sector_changes,
         raw_rba=rba_data,
         commodities=commodities,
-        global_indices_1d=global_indices
+        global_indices_1d=global_indices,
+        news_headlines=news
     )

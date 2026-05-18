@@ -157,5 +157,7 @@ class MacroRegime(BaseModel):
     sector_rotation: SectorRotation = Field(default_factory=SectorRotation)
     commodities: dict[str, float | None] = Field(default_factory=dict)
     global_indices_1d: dict[str, float | None] = Field(default_factory=dict)
+    news_headlines: list[NewsItem] = Field(default_factory=list)
+    geopolitical_context: str | None = None
     summary: str
     errors: list[str] = Field(default_factory=list)

@@ -980,3 +980,27 @@ body.light .price-plan-row { background: rgba(0, 0, 0, 0.01); }
 
 /* Fix missing TV watermark hide */
 #tv-attr-logo, .tv-lightweight-charts-logo { display: none !important; }
+
+/* MACRO HERO GEOPOLITICS */
+.macro-hero-geopolitics {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(56, 189, 248, 0.05);
+  border-left: 3px solid #38bdf8;
+  border-radius: 0 12px 12px 0;
+}
+.geo-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.geo-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+}

@@ -39,7 +39,7 @@ function analysisMessage(data) {
 function recommendationMessage(data) {
   const reasons = (data.key_reasons || []).slice(0, 4).map((item) => `- ${item.factor}`).join("\n");
   const risks = (data.key_risks || []).slice(0, 3).map((item) => `- ${item.factor}`).join("\n");
-  return `**${data.symbol}: ${data.action}** with **${data.confidence}%** confidence.\n\nRisk level: **${data.risk_level}**. Target: **${money(data.price_guidance?.target_price)}**. Stop: **${money(data.price_guidance?.stop_loss)}**.\n\n**Reasons**\n${reasons || "- Score-based decision"}\n\n**Risks**\n${risks || "- Market data may be incomplete"}`;
+  return `**${data.symbol}: ${data.action}** with **${data.conviction}%** conviction.\n\nRisk level: **${data.risk_level}**. Target: **${money(data.price_guidance?.target_price)}**. Stop: **${money(data.price_guidance?.stop_loss)}**.\n\n**Reasons**\n${reasons || "- Score-based decision"}\n\n**Risks**\n${risks || "- Market data may be incomplete"}`;
 }
 
 function templateMessage(tool, data) {

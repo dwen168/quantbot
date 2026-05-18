@@ -8,14 +8,34 @@ import httpx
 
 
 def _ollama_model() -> str:
-    preferred = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
+    env_model = os.getenv("OLLAMA_MODEL")
     try:
+        # Get list of available models
         result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=3, check=False)
-        if "gemma4:e4b" in result.stdout:
+        available_models = result.stdout
+        
+        # 1. If environment variable model is explicitly set and available, use it
+        if env_model and env_model in available_models:
+            return env_model
+            
+        # 2. Priority list of reliable models known to be functional on this machine
+        # We exclude gemma4 as it appears to have corrupted blobs in this environment
+        priorities = ["llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
+        for m in priorities:
+            if m in available_models:
+                return m
+                
+        # 3. Fallback to gemma4:e4b if nothing else, but it's likely to fail
+        if "gemma4:e4b" in available_models:
             return "gemma4:e4b"
+            
+        # 4. Last resort: first model in the list (skip header)
+        lines = available_models.strip().split("\n")
+        if len(lines) > 1:
+            return lines[1].split()[0]
     except Exception:
         pass
-    return preferred
+    return env_model or "gemma3:4b"
 
 
 def _ollama(prompt: str, model: str | None = None) -> str | None:
@@ -31,7 +51,7 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
                 ],
                 "stream": False,
             },
-            timeout=10,
+            timeout=30,
         )
         response.raise_for_status()
         return response.json().get("message", {}).get("content")
@@ -52,7 +72,7 @@ def _openai(prompt: str) -> str | None:
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 220,
             },
-            timeout=15,
+            timeout=30,
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
@@ -76,7 +96,7 @@ def _anthropic(prompt: str) -> str | None:
                 "max_tokens": 220,
                 "messages": [{"role": "user", "content": prompt}],
             },
-            timeout=15,
+            timeout=30,
         )
         response.raise_for_status()
         content: list[dict[str, Any]] = response.json().get("content", [])

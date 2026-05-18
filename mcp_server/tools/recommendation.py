@@ -31,7 +31,7 @@ def _risk_level(score: int, bearish_count: int) -> str:
 def recommend_stock(ticker: str) -> Recommendation:
     analysis = analyze_stock(ticker)
     score = analysis.scores.combined_score
-    action, confidence = _decision(score)
+    action, conviction = _decision(score)
 
     # Use last_price directly from analysis
     current = analysis.last_price
@@ -83,7 +83,7 @@ def recommend_stock(ticker: str) -> Recommendation:
         company_name=analysis.company_name,
         recommendation_date=date.today().isoformat(),
         action=action,
-        confidence=confidence,
+        conviction=conviction,
         time_horizon="MEDIUM" if action != "HOLD" else "SHORT",
         risk_level=_risk_level(score, len(analysis.bearish_signals)),
         price_guidance=PriceGuidance(
@@ -108,7 +108,7 @@ def recommend_stock(ticker: str) -> Recommendation:
     )
     prompt = (
         f"Write a concise {recommendation.action} recommendation for {recommendation.symbol}. "
-        f"Confidence {recommendation.confidence}%, risk {recommendation.risk_level}. "
+        f"Conviction {recommendation.conviction}%, risk {recommendation.risk_level}. "
         f"Reasons: {[r.factor for r in recommendation.key_reasons]}. Risks: {[r.factor for r in recommendation.key_risks]}."
     )
     recommendation.narrative = generate_narrative(prompt)

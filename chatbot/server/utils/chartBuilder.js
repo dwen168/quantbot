@@ -261,7 +261,8 @@ function buildMacroRegimeCharts(data) {
         regime: data.rates_env?.regime || "UNKNOWN",
         chinaSignal: data.china_exposure?.china_signal || "NEUTRAL",
         vixRegime: data.risk_sentiment?.vix_regime || "UNKNOWN",
-        summary: data.summary || "Structural macro environment overview."
+        summary: data.summary || "Structural macro environment overview.",
+        geopolitics: data.geopolitical_context
       },
 
       // 3. Structural Drivers Group
@@ -419,7 +420,7 @@ function buildRecommendationCharts(data) {
         companyName: data.company_name,
         price: pg.current_price,
         action: data.action,
-        confidence: data.confidence,
+        conviction: data.conviction,
         riskLevel: data.risk_level,
         horizon: data.time_horizon
       },
@@ -495,12 +496,12 @@ function buildRecommendationCharts(data) {
         columns: 3,
         widgets: [
           {
-            id: "confidence-explain",
+            id: "conviction-explain",
             type: "metric-explain",
-            label: "Confidence",
-            value: `${data.confidence ?? "n/a"}%`,
-            sentiment: (data.confidence ?? 0) >= 70 ? "bullish" : (data.confidence ?? 0) >= 50 ? "neutral" : "bearish",
-            methodology: "Derived from the Combined Score magnitude across 5 standardized confidence bands.",
+            label: "Conviction",
+            value: `${data.conviction ?? "n/a"}%`,
+            sentiment: (data.conviction ?? 0) >= 70 ? "bullish" : (data.conviction ?? 0) >= 50 ? "neutral" : "bearish",
+            methodology: "Derived from the Combined Score magnitude across 5 standardized conviction bands.",
           },
           {
             id: "risk-explain",
