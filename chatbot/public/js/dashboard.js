@@ -910,6 +910,41 @@ export function clearDashboard() {
   sessionCounter = 0;
 }
 
+export function refreshTheme() {
+  const isDark = document.body.classList.contains("dark") || !document.body.classList.contains("light");
+  const textColor = isDark ? "#94a3b8" : "#64748b";
+  const lineColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+
+  for (const [id, instance] of chartInstances.entries()) {
+    if (instance instanceof Chart) {
+      // Chart.js
+      instance.options.plugins.legend.labels.color = textColor;
+      if (instance.options.scales) {
+        if (instance.options.scales.x) {
+          instance.options.scales.x.ticks.color = textColor;
+          instance.options.scales.x.grid.color = lineColor;
+        }
+        if (instance.options.scales.y) {
+          instance.options.scales.y.ticks.color = textColor;
+          instance.options.scales.y.grid.color = lineColor;
+        }
+      }
+      instance.update();
+    } else if (instance && typeof instance.applyOptions === "function") {
+      // Lightweight Charts
+      instance.applyOptions({
+        layout: {
+          textColor: textColor
+        },
+        grid: {
+          vertLines: { color: lineColor },
+          horzLines: { color: lineColor }
+        }
+      });
+    }
+  }
+}
+
 export function render(response, sessionId) {
   const dashboard = document.getElementById("dashboard");
   const subtitle = document.getElementById("dashboard-subtitle");

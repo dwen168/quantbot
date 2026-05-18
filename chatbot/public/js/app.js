@@ -1,12 +1,21 @@
 import { initChat } from "./chat.js";
+import { refreshTheme } from "./dashboard.js";
 
 function initTheme() {
   const button = document.getElementById("theme-toggle");
   const stored = localStorage.getItem("quantbot-theme");
-  if (stored === "dark") document.body.classList.add("dark");
+  
+  if (stored === "light") {
+    document.body.classList.add("light");
+  } else {
+    document.body.classList.remove("light");
+  }
+
   button.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("quantbot-theme", document.body.classList.contains("dark") ? "dark" : "light");
+    document.body.classList.toggle("light");
+    const isLight = document.body.classList.contains("light");
+    localStorage.setItem("quantbot-theme", isLight ? "light" : "dark");
+    refreshTheme();
   });
 }
 
