@@ -3,28 +3,56 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>QuantBot ASX Intelligence</title>
+    <title>QuantBot — ASX Intelligence Platform</title>
+    <meta name="description" content="AI-powered Australian Stock Market Intelligence. Technical analysis, macro regime, and trade recommendations for ASX stocks.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/app.css">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>QuantBot</h1>
-          <span>ASX Stock Intelligence</span>
+        <div class="topbar-brand">
+          <div class="topbar-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 17L9 11L13 15L21 7" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 7H21V11" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <defs>
+                <linearGradient id="logoGrad" x1="3" y1="12" x2="21" y2="12" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#a78bfa"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div>
+            <h1>QuantBot</h1>
+            <span class="topbar-tagline">ASX Intelligence Platform</span>
+          </div>
         </div>
-        <button id="theme-toggle" class="icon-button" type="button" title="Toggle theme">T</button>
+        <div class="topbar-actions">
+          <div class="topbar-status">
+            <span class="status-dot"></span>
+            <span class="status-label">Live</span>
+          </div>
+          <button id="theme-toggle" class="icon-button" type="button" title="Toggle theme" aria-label="Toggle light/dark theme">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </button>
+        </div>
       </header>
 
       <main id="split-layout" class="split-layout">
         <section class="chat-pane" aria-label="Chat">
           <div class="chat-header">
-            <div>
-              <h2>Chat</h2>
-              <p>Ask about ASX tickers, macro context, analysis, or recommendations.</p>
+            <div class="chat-header-left">
+              <h2>AI Chat</h2>
+              <p>Ask about ASX stocks, macro context, or trade ideas</p>
             </div>
             <label class="model-picker">
               <span>Model</span>
@@ -38,54 +66,64 @@
             <article class="message assistant">
               <div class="bubble">
                 <div class="welcome-header">
-                  <strong>👋 Welcome to QuantBot ASX Intelligence</strong>
-                  <p>I am your AI-powered co-pilot for the Australian stock market. I combine technical data, macro signals, and real-time news to help you make informed decisions.</p>
+                  <div class="welcome-icon">⚡</div>
+                  <strong>Welcome to QuantBot</strong>
+                  <p>Your AI-powered co-pilot for the Australian stock market. I combine real-time technical data, macro signals, and news intelligence to help you make better decisions.</p>
                 </div>
                 
                 <div class="capabilities-grid">
                   <div class="cap-item">
                     <span class="cap-icon">📰</span>
                     <strong>Market Pulse</strong>
-                    <p>Get instant snapshots of the ASX200, sectors, commodities, and geopolitics.</p>
+                    <p>ASX200, sectors, commodities & macro signals</p>
                     <code>"How is the market today?"</code>
                   </div>
                   <div class="cap-item">
                     <span class="cap-icon">🔬</span>
                     <strong>Deep Analysis</strong>
-                    <p>Multidimensional research combining technicals and macro environment.</p>
+                    <p>Technicals + fundamentals + macro context</p>
                     <code>"Analyze CBA"</code>
                   </div>
                   <div class="cap-item">
                     <span class="cap-icon">📊</span>
-                    <strong>Technical Data</strong>
-                    <p>Precise indicators: RSI, MACD, Trend, and ATR-based support levels.</p>
+                    <strong>Technicals</strong>
+                    <p>RSI, MACD, Trend, ATR support levels</p>
                     <code>"Technicals for BHP"</code>
                   </div>
                   <div class="cap-item">
                     <span class="cap-icon">🌐</span>
                     <strong>Macro Regime</strong>
-                    <p>Structural economic anchors, interest rate regimes, and risk environment.</p>
+                    <p>Rate regimes, risk environment, and cycles</p>
                     <code>"Macro Regime"</code>
                   </div>
                   <div class="cap-item">
                     <span class="cap-icon">⭐</span>
                     <strong>Trade Ideas</strong>
-                    <p>AI-driven recommendations with confidence scores and risk assessment.</p>
+                    <p>AI recommendations with confidence scores</p>
                     <code>"Should I buy FMG?"</code>
                   </div>
                 </div>
 
-                <p style="margin-top: 12px; font-size: 11px; opacity: 0.7;">
-                  <em>Tip: Use any ASX ticker or ask general macro questions to begin.</em><br>
-                  <span style="opacity: 0.8; display: inline-block; margin-top: 4px;">Data via Yahoo Finance & RBA (Delayed 20min).</span>
+                <p class="welcome-footer">
+                  <em>Data via Yahoo Finance &amp; RBA · 20min delay</em>
                 </p>
               </div>
             </article>
           </div>
 
           <form id="chat-form" class="chat-form">
-            <input id="chat-input" autocomplete="off" placeholder="Type an ASX question..." aria-label="Chat message">
-            <button type="submit">Send</button>
+            <div class="chat-input-wrap">
+              <svg class="chat-input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input id="chat-input" autocomplete="off" placeholder="Ask about ASX stocks, analysis, or market..." aria-label="Chat message">
+            </div>
+            <button type="submit" id="send-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              <span>Send</span>
+            </button>
           </form>
         </section>
 
@@ -95,14 +133,24 @@
           <div class="dashboard-header">
             <div>
               <h2>Dashboard</h2>
-              <p id="dashboard-subtitle">Results accumulate here. Click a chat message to jump to its panel.</p>
+              <p id="dashboard-subtitle">Analysis results appear here</p>
             </div>
-            <button id="clear-dashboard-btn" class="icon-button" type="button" title="Clear all dashboard panels">✕ Clear</button>
+            <button id="clear-dashboard-btn" class="clear-btn" type="button" title="Clear all dashboard panels">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+              </svg>
+              Clear
+            </button>
           </div>
           <div id="dashboard" class="dashboard empty">
             <div class="empty-state">
-              <p>No dashboard data yet.</p>
-              <p style="font-size: 13px; opacity: 0.8; margin-top: 8px;">Try asking: <strong>"Analyze CBA"</strong> or <strong>"Market Snapshot"</strong></p>
+              <div class="empty-state-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.3">
+                  <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                </svg>
+              </div>
+              <p class="empty-state-title">No analysis yet</p>
+              <p class="empty-state-hint">Try: <strong>"Analyze CBA"</strong> or <strong>"Market Snapshot"</strong></p>
             </div>
           </div>
         </section>
