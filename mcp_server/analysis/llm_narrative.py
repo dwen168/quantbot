@@ -7,7 +7,13 @@ from typing import Any
 import httpx
 
 
+_MODEL_CACHE: str | None = None
+
 def _ollama_model() -> str:
+    global _MODEL_CACHE
+    if _MODEL_CACHE:
+        return _MODEL_CACHE
+
     env_model = os.getenv("OLLAMA_MODEL")
     try:
         # Get list of available models
@@ -16,26 +22,31 @@ def _ollama_model() -> str:
         
         # 1. If environment variable model is explicitly set and available, use it
         if env_model and env_model in available_models:
-            return env_model
+            _MODEL_CACHE = env_model
+            return _MODEL_CACHE
             
         # 2. Priority list of reliable models known to be functional on this machine
-        # We exclude gemma4 as it appears to have corrupted blobs in this environment
         priorities = ["llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
         for m in priorities:
             if m in available_models:
-                return m
+                _MODEL_CACHE = m
+                return _MODEL_CACHE
                 
-        # 3. Fallback to gemma4:e4b if nothing else, but it's likely to fail
+        # 3. Fallback to gemma4:e4b if nothing else
         if "gemma4:e4b" in available_models:
-            return "gemma4:e4b"
+            _MODEL_CACHE = "gemma4:e4b"
+            return _MODEL_CACHE
             
         # 4. Last resort: first model in the list (skip header)
         lines = available_models.strip().split("\n")
         if len(lines) > 1:
-            return lines[1].split()[0]
+            _MODEL_CACHE = lines[1].split()[0]
+            return _MODEL_CACHE
     except Exception:
         pass
-    return env_model or "gemma3:4b"
+    
+    _MODEL_CACHE = env_model or "gemma3:4b"
+    return _MODEL_CACHE
 
 
 def _ollama(prompt: str, model: str | None = None) -> str | None:

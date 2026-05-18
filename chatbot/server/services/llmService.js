@@ -14,13 +14,22 @@ async function fetchJson(url, options = {}) {
   }
 }
 
+let cachedModels = null;
+let lastFetchTime = 0;
+const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
+
 export async function listModels() {
+  if (cachedModels && (Date.now() - lastFetchTime < CACHE_TTL)) {
+    return cachedModels;
+  }
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
   try {
     const data = await fetchJson(`${baseUrl}/api/tags`, { timeout: 2500 });
-    return (data.models || []).map((model) => model.name).sort();
+    cachedModels = (data.models || []).map((model) => model.name).sort();
+    lastFetchTime = Date.now();
+    return cachedModels;
   } catch {
-    return [];
+    return cachedModels || [];
   }
 }
 

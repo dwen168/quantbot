@@ -44,10 +44,10 @@ def _key_levels(prices: list[float], current: float | None, atr: float | None = 
     )
 
 
-def analyze_stock(ticker: str) -> StockAnalysis:
+def analyze_stock(ticker: str, include_narrative: bool = True) -> StockAnalysis:
     symbol = normalize_asx_ticker(ticker)
     technical = get_technical_indicators(ticker, "2y")
-    regime = get_macro_regime()
+    regime = get_macro_regime(include_narrative=False)
     info = get_info(symbol)
     sector = info.get("sector")
     scored = score_stock(technical, regime, sector=sector)
@@ -103,9 +103,13 @@ def analyze_stock(ticker: str) -> StockAnalysis:
         bearish_signals=scored.bearish_signals[:8],
         risk_factors=(scored.risk_factors or scored.bearish_signals)[:6],
     )
-    prompt = (
-        f"Summarise {analysis.symbol} in 4 sentences. Combined score {analysis.scores.combined_score}. "
-        f"Bullish: {[s.factor for s in analysis.bullish_signals]}. Bearish: {[s.factor for s in analysis.bearish_signals]}. Risks: {[s.factor for s in analysis.risk_factors]}."
-    )
-    analysis.narrative = generate_narrative(prompt)
+    
+    analysis.narrative = "Analysis completed. Narrative deferred."
+    if include_narrative:
+        prompt = (
+            f"Summarise {analysis.symbol} in 4 sentences. Combined score {analysis.scores.combined_score}. "
+            f"Bullish: {[s.factor for s in analysis.bullish_signals]}. Bearish: {[s.factor for s in analysis.bearish_signals]}. Risks: {[s.factor for s in analysis.risk_factors]}."
+        )
+        analysis.narrative = generate_narrative(prompt)
+    
     return analysis

@@ -56,6 +56,11 @@ function sendSSE(res, data) {
 }
 
 async function maybeSummarize({ tool, data, model }) {
+  // If the Python tool already provided a narrative, use it!
+  if (data && data.narrative && data.narrative !== "Analysis completed. Narrative deferred.") {
+    return data.narrative;
+  }
+
   const base = templateMessage(tool, data);
   const summary = await generateChatSummary({
     model,

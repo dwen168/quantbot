@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
@@ -68,7 +69,10 @@ def _fetch_news() -> list[NewsItem]:
         "^GSPC": "Macro",
         "^VIX": "Risk"
     }
-    for ticker, category in ticker_map.items():
+    
+    def fetch_ticker_news(ticker_cat):
+        ticker, category = ticker_cat
+        ticker_news = []
         for item in get_news(ticker, 5):
             published = item.get("providerPublishTime") or item.get("pubDate")
             if isinstance(published, int):
@@ -78,7 +82,7 @@ def _fetch_news() -> list[NewsItem]:
             url = item.get("link") or item.get("url") or content.get("canonicalUrl", {}).get("url")
             publisher = item.get("publisher") or content.get("provider", {}).get("displayName")
             if title:
-                items.append(NewsItem(
+                ticker_news.append(NewsItem(
                     title=title, 
                     publisher=publisher, 
                     published=published, 
@@ -86,6 +90,13 @@ def _fetch_news() -> list[NewsItem]:
                     related_ticker=ticker,
                     category=category
                 ))
+        return ticker_news
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = executor.map(fetch_ticker_news, ticker_map.items())
+        for res in results:
+            items.extend(res)
+
     seen: set[str] = set()
     unique: list[NewsItem] = []
     for item in items:
@@ -100,41 +111,62 @@ def fetch_macro_core() -> MacroCore:
     Step 1: Centralized data fetching for all macro-related tools.
     Reduces duplicate network calls to RBA and yfinance.
     """
-    # 1. RBA
-    rba_data = get_cash_rate()
-    cash_rate = rba_data.get("cash_rate")
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # 1. RBA
+        fut_rba = executor.submit(get_cash_rate)
+        
+        # 2. VIX
+        fut_vix = executor.submit(_last_close, "^VIX", "5d")
+        
+        # 3. China Indicators
+        fut_shanghai_ytd = executor.submit(_pct_change, "000001.SS", "ytd")
+        fut_aud_cny_3m = executor.submit(_pct_change, "AUDCNY=X", "3mo")
+        fut_iron_ore_ytd = executor.submit(_pct_change, "QRE.AX", "ytd")
+        
+        # 4. Sector Rotation
+        fut_sectors = {
+            name: executor.submit(_pct_change, code, "1mo")
+            for code, name in SECTOR_PROXIES.items()
+        }
+        
+        # 5. Commodities
+        fut_gold = executor.submit(_last_close, "GC=F")
+        fut_oil = executor.submit(_last_close, "CL=F")
+        fut_copper = executor.submit(_last_close, "HG=F")
+        fut_iron_ore = executor.submit(_last_close, "QRE.AX")
+        
+        # 6. Global 1D Performance
+        fut_sp500_1d = executor.submit(_pct_change, "^GSPC", "5d", days=2)
+        fut_nasdaq_1d = executor.submit(_pct_change, "^IXIC", "5d", days=2)
+        fut_shanghai_1d = executor.submit(_pct_change, "000001.SS", "5d", days=2)
+        
+        # 7. News
+        fut_news = executor.submit(_fetch_news)
 
-    # 2. VIX
-    vix = _last_close("^VIX", "5d")
-
-    # 3. China Indicators
-    shanghai_ytd = _pct_change("000001.SS", "ytd")
-    aud_cny_3m = _pct_change("AUDCNY=X", "3mo")
-    iron_ore_ytd = _pct_change("QRE.AX", "ytd")
-
-    # 4. Sector Rotation (basic check)
-    sector_changes = {
-        name: _pct_change(code, "1mo")
-        for code, name in SECTOR_PROXIES.items()
-    }
-
-    # 5. Commodities
-    commodities = {
-        "gold": _last_close("GC=F"),
-        "oil": _last_close("CL=F"),
-        "copper": _last_close("HG=F"),
-        "iron_ore": _last_close("QRE.AX")
-    }
-
-    # 6. Global 1D Performance
-    global_indices = {
-        "sp500": _pct_change("^GSPC", "5d", days=2),
-        "nasdaq": _pct_change("^IXIC", "5d", days=2),
-        "shanghai": _pct_change("000001.SS", "5d", days=2)
-    }
-
-    # 7. News
-    news = _fetch_news()
+        # Collect Results
+        rba_data = fut_rba.result()
+        cash_rate = rba_data.get("cash_rate")
+        vix = fut_vix.result()
+        shanghai_ytd = fut_shanghai_ytd.result()
+        aud_cny_3m = fut_aud_cny_3m.result()
+        iron_ore_ytd = fut_iron_ore_ytd.result()
+        
+        sector_changes = {name: fut.result() for name, fut in fut_sectors.items()}
+        
+        commodities = {
+            "gold": fut_gold.result(),
+            "oil": fut_oil.result(),
+            "copper": fut_copper.result(),
+            "iron_ore": fut_iron_ore.result()
+        }
+        
+        global_indices = {
+            "sp500": fut_sp500_1d.result(),
+            "nasdaq": fut_nasdaq_1d.result(),
+            "shanghai": fut_shanghai_1d.result()
+        }
+        
+        news = fut_news.result()
 
     return MacroCore(
         cash_rate=cash_rate,

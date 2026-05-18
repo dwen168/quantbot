@@ -29,7 +29,7 @@ def _risk_level(score: int, bearish_count: int) -> str:
 
 
 def recommend_stock(ticker: str) -> Recommendation:
-    analysis = analyze_stock(ticker)
+    analysis = analyze_stock(ticker, include_narrative=False)
     score = analysis.scores.combined_score
     action, conviction = _decision(score)
 

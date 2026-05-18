@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 
 import pandas as pd
@@ -74,55 +75,96 @@ def get_market_snapshot() -> MarketSnapshot:
     if core.raw_rba.get("error"):
         errors.append(f"RBA data issue: {core.raw_rba['error']}")
 
-    sectors: list[SectorPerf] = []
-    for code, name in SECTOR_PROXIES.items():
-        sectors.append(SectorPerf(
+    def fetch_sector_perf(args):
+        code, name = args
+        return SectorPerf(
             code=code, 
             name=name, 
             one_d_pct=_pct_change(code, "5d", days=2),
             series=_history(code, "3mo")
-        ))
-    sectors.sort(key=lambda item: item.one_d_pct if item.one_d_pct is not None else -999, reverse=True)
+        )
 
-    return MarketSnapshot(
-        as_of_date=date.today().isoformat(),
-        asx_market=ASXMarket(
-            asx200_level=_last_close("^AXJO"),
-            asx200_1d_change=_pct_change("^AXJO", "5d", days=2),
-            asx200_1mo_change=_pct_change("^AXJO", "1mo"),
-            asx200_ytd_change=_pct_change("^AXJO", "ytd"),
-            rba_cash_rate=core.cash_rate,
-            top_sectors=sectors,
-        ),
-        currencies=Currencies(
-            aud_usd=_last_close("AUDUSD=X"),
-            aud_cny=_last_close("AUDCNY=X"),
-            aud_usd_1mo_change=_pct_change("AUDUSD=X", "1mo"),
-            aud_usd_series=_history("AUDUSD=X"),
-            aud_cny_series=_history("AUDCNY=X"),
-        ),
-        commodities=Commodities(
-            iron_ore_etf_proxy=_last_close("QRE.AX"),
-            gold_usd=_last_close("GC=F"),
-            crude_oil_usd=_last_close("CL=F"),
-            copper_usd=_last_close("HG=F"),
-            coal_proxy_ticker=_last_close("WHC.AX"),
-            iron_ore_series=_history("QRE.AX"),
-            gold_usd_series=_history("GC=F"),
-            crude_oil_usd_series=_history("CL=F"),
-            copper_usd_series=_history("HG=F"),
-            coal_series=_history("WHC.AX"),
-        ),
-        global_indices=GlobalIndices(
-            sp500_1d_change=_pct_change("^GSPC", "5d", days=2),
-            nasdaq_1d_change=_pct_change("^IXIC", "5d", days=2),
-            shanghai_1d_change=_pct_change("000001.SS", "5d", days=2),
-            hang_seng_1d_change=_pct_change("^HSI", "5d", days=2),
-            sp500_series=_history("^GSPC", "3mo"),
-            nasdaq_series=_history("^IXIC", "3mo"),
-            shanghai_series=_history("000001.SS", "3mo"),
-            hang_seng_series=_history("^HSI", "3mo"),
-        ),
-        news_headlines=core.news_headlines,
-        errors=errors,
-    )
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Sectors
+        fut_sectors = list(executor.map(fetch_sector_perf, SECTOR_PROXIES.items()))
+        
+        # Market
+        fut_asx200_close = executor.submit(_last_close, "^AXJO")
+        fut_asx200_1d = executor.submit(_pct_change, "^AXJO", "5d", days=2)
+        fut_asx200_1mo = executor.submit(_pct_change, "^AXJO", "1mo")
+        fut_asx200_ytd = executor.submit(_pct_change, "^AXJO", "ytd")
+        
+        # Currencies
+        fut_aud_usd = executor.submit(_last_close, "AUDUSD=X")
+        fut_aud_cny = executor.submit(_last_close, "AUDCNY=X")
+        fut_aud_usd_1mo = executor.submit(_pct_change, "AUDUSD=X", "1mo")
+        fut_aud_usd_history = executor.submit(_history, "AUDUSD=X")
+        fut_aud_cny_history = executor.submit(_history, "AUDCNY=X")
+        
+        # Commodities
+        fut_iron_ore_proxy = executor.submit(_last_close, "QRE.AX")
+        fut_gold = executor.submit(_last_close, "GC=F")
+        fut_oil = executor.submit(_last_close, "CL=F")
+        fut_copper = executor.submit(_last_close, "HG=F")
+        fut_coal = executor.submit(_last_close, "WHC.AX")
+        fut_iron_ore_history = executor.submit(_history, "QRE.AX")
+        fut_gold_history = executor.submit(_history, "GC=F")
+        fut_oil_history = executor.submit(_history, "CL=F")
+        fut_copper_history = executor.submit(_history, "HG=F")
+        fut_coal_history = executor.submit(_history, "WHC.AX")
+        
+        # Global
+        fut_sp500_1d = executor.submit(_pct_change, "^GSPC", "5d", days=2)
+        fut_nasdaq_1d = executor.submit(_pct_change, "^IXIC", "5d", days=2)
+        fut_shanghai_1d = executor.submit(_pct_change, "000001.SS", "5d", days=2)
+        fut_hang_seng_1d = executor.submit(_pct_change, "^HSI", "5d", days=2)
+        fut_sp500_history = executor.submit(_history, "^GSPC", "3mo")
+        fut_nasdaq_history = executor.submit(_history, "^IXIC", "3mo")
+        fut_shanghai_history = executor.submit(_history, "000001.SS", "3mo")
+        fut_hang_seng_history = executor.submit(_history, "^HSI", "3mo")
+
+        sectors = fut_sectors
+        sectors.sort(key=lambda item: item.one_d_pct if item.one_d_pct is not None else -999, reverse=True)
+
+        return MarketSnapshot(
+            as_of_date=date.today().isoformat(),
+            asx_market=ASXMarket(
+                asx200_level=fut_asx200_close.result(),
+                asx200_1d_change=fut_asx200_1d.result(),
+                asx200_1mo_change=fut_asx200_1mo.result(),
+                asx200_ytd_change=fut_asx200_ytd.result(),
+                rba_cash_rate=core.cash_rate,
+                top_sectors=sectors,
+            ),
+            currencies=Currencies(
+                aud_usd=fut_aud_usd.result(),
+                aud_cny=fut_aud_cny.result(),
+                aud_usd_1mo_change=fut_aud_usd_1mo.result(),
+                aud_usd_series=fut_aud_usd_history.result(),
+                aud_cny_series=fut_aud_cny_history.result(),
+            ),
+            commodities=Commodities(
+                iron_ore_etf_proxy=fut_iron_ore_proxy.result(),
+                gold_usd=fut_gold.result(),
+                crude_oil_usd=fut_oil.result(),
+                copper_usd=fut_copper.result(),
+                coal_proxy_ticker=fut_coal.result(),
+                iron_ore_series=fut_iron_ore_history.result(),
+                gold_usd_series=fut_gold_history.result(),
+                crude_oil_usd_series=fut_oil_history.result(),
+                copper_usd_series=fut_copper_history.result(),
+                coal_series=fut_coal_history.result(),
+            ),
+            global_indices=GlobalIndices(
+                sp500_1d_change=fut_sp500_1d.result(),
+                nasdaq_1d_change=fut_nasdaq_1d.result(),
+                shanghai_1d_change=fut_shanghai_1d.result(),
+                hang_seng_1d_change=fut_hang_seng_1d.result(),
+                sp500_series=fut_sp500_history.result(),
+                nasdaq_series=fut_nasdaq_history.result(),
+                shanghai_series=fut_shanghai_history.result(),
+                hang_seng_series=fut_hang_seng_history.result(),
+            ),
+            news_headlines=core.news_headlines,
+            errors=errors,
+        )
