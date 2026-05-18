@@ -336,10 +336,8 @@ function buildAnalysisCharts(data) {
         combinedScore,
         techScore,
         macroScore,
-        techBullCount: techBullish.length,
-        techBearCount: techBearish.length,
-        macroBullCount: macroBullish.length,
-        macroRiskCount: macroRisks.length
+        bullishCount: techBullish.length + macroBullish.length,
+        bearishCount: techBearish.length + macroRisks.length
       },
 
       // 2. Technical Assessment — Flattened into 3 columns
