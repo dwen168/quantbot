@@ -481,9 +481,9 @@ function buildRecommendationCharts(data) {
       kv("market-context", "Market Context & Impact", [
         ["ASX200 Level",  fmt(data.market_context?.asx200_level)],
         ["AUD/USD",       fmt(data.market_context?.aud_usd)],
-        ["VIX (Risk)",    fmt(data.market_context?.vix_level),   "", (data.market_context?.vix_level > 20 ? " (Headwind)" : " (Tailwind)")],
-        ["RBA Cash Rate", fmt(data.market_context?.rba_cash_rate, "%"), "", (data.market_context?.rba_cash_rate >= 4 ? " (Headwind)" : " (Tailwind)")],
-        ["Iron Ore",      fmt(data.market_context?.iron_ore_price, "", "$"), "", (data.market_context?.iron_ore_price > 100 ? " (Tailwind)" : " (Neutral)")],
+        ["VIX (Risk)",    fmt(data.market_context?.vix_level) + (data.market_context?.vix_level > 20 ? " (Headwind)" : " (Tailwind)")],
+        ["RBA Cash Rate", fmt(data.market_context?.rba_cash_rate, "%") + (data.market_context?.rba_cash_rate >= 4 ? " (Headwind)" : " (Tailwind)")],
+        ["Iron Ore",      fmt(data.market_context?.iron_ore_price, "", "$") + (data.market_context?.iron_ore_price > 100 ? " (Tailwind)" : " (Neutral)")],
       ], { description: "Macro environment metrics and their directional impact on the score.", hideBadges: true }),
 
       // 6. Conviction Methodology — 3 columns

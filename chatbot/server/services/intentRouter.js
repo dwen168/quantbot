@@ -42,17 +42,14 @@ async function validateTicker(ticker) {
 async function getIntentWithLLM(message) {
   const systemPrompt = `You are a classifier for an ASX stock research chatbot.
 Classify the user message into one of these intents:
-- STOCK_QUERY: Technical data/charts for a specific ticker (e.g., "price of BHP", "show me CBA chart").
-- ANALYSIS: Detailed research/scoring for a ticker (e.g., "analyze MSB", "is RIO a good buy?").
-- RECOMMENDATION: Specific trade signals/targets (e.g., "give me a recommendation for XRO").
-- MARKET_SNAPSHOT: General market pulse, RBA interest rates, news, commodities, or currencies (e.g., "how is the market today?", "what are the RBA rates?", "gold price").
-- MACRO_REGIME: Structural economic "anchors" and market regimes (e.g., "macro regime", "current market context", "inflation/CPI data", "GDP and unemployment", "yield curve").
+- RECOMMENDATION: Actionable trade advice, signals, or "buy/sell/hold" questions for a specific ticker (e.g., "should I buy BHP?", "give me a recommendation for XRO", "trade signals for CBA").
+- ANALYSIS: In-depth research, scoring, or assessment of a stock without asking for a direct trade action (e.g., "analyze MSB", "research for RIO", "stock assessment for FMG").
+- STOCK_QUERY: Raw technical data, prices, or charts (e.g., "price of BHP", "show me CBA chart", "technicals for TLS").
+- MARKET_SNAPSHOT: General market pulse, interest rates, news, commodities, or currencies (e.g., "market today?", "rba rates", "gold price").
+- MACRO_REGIME: Structural economic context and anchors (e.g., "macro regime", "inflation data", "GDP and unemployment").
 - UNKNOWN: General chat or unrecognised requests.
 
-- "ticker": The 2-5 letter ASX ticker symbol if a specific stock is mentioned, else null.
-- "intent": The chosen intent string.
-
-IMPORTANT: "MACRO" or "CONTEXT" are NOT tickers. Return ONLY JSON.`;
+Return JSON with "ticker" (2-5 letter symbol or null) and "intent".`;
 
   const tryParseResult = (content) => {
     try {
@@ -165,12 +162,15 @@ export async function routeIntent(message) {
   }
 
   const ticker = extractTicker(text);
-  if (ticker && /\b(recommend|buy|sell|hold|should i|trade|target|stop loss)\b/i.test(text)) {
+  // RECOMMENDATION: Strong trade-action keywords
+  if (ticker && /\b(recommend|buy|sell|hold|should i|shall i|trade|signal|target|stop loss|is .* buy)\b/i.test(text)) {
     return finalizeResult({ intent: INTENTS.RECOMMENDATION, params: { ticker } });
   }
-  if (ticker && /\b(analy[sz]e|analysis|assess|score|signal|bullish|bearish|research)\b/i.test(text)) {
+  // ANALYSIS: Deep research or assessment keywords
+  if (ticker && /\b(analy[sz]e|analysis|assess|score|research|evaluate|rating)\b/i.test(text)) {
     return finalizeResult({ intent: INTENTS.ANALYSIS, params: { ticker } });
   }
+  // STOCK_QUERY: Raw data, charts, or indicators
   if (ticker && /\b(price|chart|technical|indicator|52 week|p\/e|pe|rsi|macd|trend|volume|tell me)\b/i.test(lower)) {
     return finalizeResult({ intent: INTENTS.STOCK_QUERY, params: { ticker, period: "2y" } });
   }
