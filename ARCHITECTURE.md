@@ -4,13 +4,12 @@ This document describes the high-level architecture, service relationships, and 
 
 ## 1. System Overview
 
-QuantBot is a multi-layered application designed for professional ASX stock analysis. it follows a **Decoupled Orchestration** pattern where a Node.js server acts as the "Brain" (UI, Routing, Streaming) and a Python MCP server acts as the "Specialist" (Data, Scoring, Quantitative Analysis).
+QuantBot is a multi-layered application designed for professional ASX stock analysis. it follows a **Decoupled Orchestration** pattern where a Node.js server acts as the "Brain" (UI, Routing, Streaming, Model Selection, Dashboard Assemebly) and a Python MCP server acts as the "Specialist" (Data, Scoring, Quantitative Analysis).
 
----
 
 ## 2. High-Level Components
 
-## System Architecture Diagram
+## System High-Level Integration Diagram
 
 ```mermaid
 flowchart LR
@@ -51,6 +50,7 @@ flowchart LR
 
     IntentRouter --> MCPClient
     IntentRouter --> LLMService
+    LLMService --> ChatRoute
 
     MCPClient --> MCPTools
 
@@ -61,12 +61,12 @@ flowchart LR
     Scoring --> RBA
     Scoring --> ABS
 
-    MCPTools --> ChartBuilder
-
+    MCPTools --> ChatRoute
+    ChatRoute --> ChartBuilder
+    ChatRoute --> SSE
     ChartBuilder --> Dashboard
 
-    LLMService --> SSE
-    Dashboard --> SSE
+    SSE --> Dashboard
 
 ```
 
@@ -75,7 +75,7 @@ flowchart LR
 * **Technology:** Vanilla JavaScript (ES Modules), CSS3 (Modern Glassmorphism), Chart.js, Lightweight Charts.
 * **`public/index.html`**: SPA shell with a split-pane layout (Chat left, Dashboard right).
 * **`public/js/app.js`**: The main entry point. Orchestrates the global state, theme persistence (Light/Dark mode), and handles the split-pane resizing logic.
-* **`public/js/chat.js`**: Core UI controller. Handles real-time communication via **Server-Sent Events (SSE)**, renders message bubbles, and manages the SSE progress bar.
+* **`public/js/chat.js`**: Core UI controller. Handles real-time communication via **Server-Sent Events (SSE)**, renders message bubbles, and manages the SSE progress bar and per-response duration.
 * **`public/js/dashboard.js`**: A specialized rendering engine that transforms JSON widget descriptors from the server into interactive UI components (Charts, Hero cards, Tables).
 
 ### B. Chatbot Server (Orchestration Tier)
@@ -87,10 +87,10 @@ flowchart LR
 
   * `intentRouter.js`: Hybrid intent classification (LLM + Heuristics).
   * `mcpClient.js`: The bridge to the Python environment via MCP Protocol.
-  * `llmService.js`: Interface for chat summarization (Ollama/OpenAI).
+  * `llmService.js`: Interface for chat summarization and JSON classification across Ollama and Gemini, with OpenAI used in the general-chat fallback path.
 * **`server/utils/`**: The "UI Factory" layer.
 
-  * `chartBuilder.js`: A critical mapping engine that takes raw Python tool outputs and assembles them into standardized JSON "widgets" (e.g., `stock-hero`, `price-plan`, `mini-charts`) that the frontend can render.
+  * `chartBuilder.js`: A critical mapping engine that takes raw Python tool outputs and assembles them into standardized JSON "widgets" (e.g., `stock-hero`, `price-plan`, `mini-charts`,`score-hero`) that the frontend can render.
 
 ### C. MCP Server (Intelligence Tier)
 
@@ -126,7 +126,6 @@ flowchart LR
   * `rba_client.py`: Official RBA cash rate data via CSV parsing.
   * `abs_client.py`: Key economic indicators (CPI, GDP, Unemployment) via stable RBA proxies.
 
----
 
 ## 3. Data Flow & Routing
 
@@ -136,11 +135,10 @@ flowchart LR
 4. **Language Bridge**: `mcpClient.js` invokes the Python sub-process (via JSON-RPC over `stdio`) to call the corresponding `recommend_stock` tool.
 5. **Quantitative Execution**: The Python `mcp_server` fetches data via `yfinance_client` and `rba_client`, calculates scores using `analysis/scoring.py`, and returns a structured Pydantic-validated payload.
 6. **UI Assembly**: `chartBuilder.js` transforms the raw Python result into an array of "UI Widgets" (JSON descriptors for heroes, tables, and trade plans).
-7. **Conversational Layer**: `llmService.js` is called to turn the raw data into a concise, human-friendly summary for the chat bubble.
+7. **Conversational Layer**: If the Python tool already provided a narrative, the chat route uses it directly. Otherwise, `llmService.js` is called to turn the raw data into a concise, human-friendly summary for the chat bubble.
 8. **Real-time Delivery**: The chat router streams progress events (e.g., 25%, 50%) to the client. Finally, it sends a `complete` event containing the text and the widget array.
-9. **Rendering**: `chat.js` updates the chat history and passes the widget data to `dashboard.js`, which performs the final DOM construction and initializes the charts.
+9. **Rendering**: `chat.js` consumes the SSE stream, updates the chat history and passes the widget data to `dashboard.js`, which performs the final DOM construction and initializes the charts.
 
----
 
 ## 4. Project Directory Structure
 
@@ -154,11 +152,12 @@ flowchart LR
 │   │   │   ├── chat.js      # SSE Handler & Message UI
 │   │   │   └── dashboard.js # Widget Rendering Engine
 │   │   └── index.html       # SPA Container Shell
+│   ├── package.json         # Node.js Chatbot Config
 │   └── server/              # Server-side Logic
 │       ├── routes/chat.js   # SSE Pipeline & Task Orchestration
 │       ├── services/        # Business Logic Layer
 │       │   ├── intentRouter.js # Intent Classification (LLM+Heuristics)
-│       │   ├── llmService.js   # AI Summarization Interface
+│       │   ├── llmService.js   # Provide Abstraction, AI Summarization & Classification
 │       │   └── mcpClient.js    # MCP stdio Protocol Bridge
 │       └── utils/           # Helper Layer
 │           └── chartBuilder.js # UI Widget Factory (JSON Transformer)
@@ -175,10 +174,9 @@ flowchart LR
 │   └── server.py            # FastMCP Main Entry Point
 ├── ARCHITECTURE.md          # System Documentation (Local Only)
 ├── pyproject.toml           # Python Environment Config
-├── package.json             # Node.js Environment Config
+├── package.json             # Node.js Environment Config, Root Dependency Lockfile
 ```
 
----
 
 ## 5. Deployment & Persistence
 
@@ -203,7 +201,6 @@ This architecture reflects a broader industry trend where Large Language Models 
 
 while deterministic business logic, quantitative calculations, and external integrations remain in specialized services.
 
----
 
 ## A.2 Industry Trend: AI Agents + Tool Calling
 
@@ -230,7 +227,6 @@ In this model:
 
 This significantly improves reliability, explainability, and extensibility.
 
----
 
 ## A.3 Why MCP Instead of Embedding Everything Inside the LLM?
 
@@ -266,7 +262,6 @@ The MCP-based architecture solves this by introducing a clean separation of conc
 
 This separation makes the system substantially more stable for financial applications.
 
----
 
 ## A.4 Benefits of MCP-Based Decoupled Architecture
 
@@ -284,7 +279,6 @@ without rewriting the quantitative engine.
 
 The MCP server becomes a reusable intelligence layer independent from the LLM vendor.
 
----
 
 ### B. Stronger Reliability
 
@@ -300,7 +294,6 @@ Using Python quantitative engines ensures:
 * Better debugging
 * Lower hallucination risk
 
----
 
 ### C. Scalable Tool Ecosystem
 
@@ -317,7 +310,6 @@ New features can be added independently:
 
 without modifying the frontend orchestration flow.
 
----
 
 ### D. Multi-Language Strengths
 
@@ -328,7 +320,6 @@ The architecture intentionally uses:
 
 This leverages the strengths of both ecosystems instead of forcing all logic into a single runtime.
 
----
 
 ## A.5 MCP as a Standardized AI Interface Layer
 
@@ -352,7 +343,6 @@ The architecture therefore aligns with the broader industry direction toward:
 * Modular AI infrastructure
 * Interoperable AI services
 
----
 
 ## A.6 Why This Matters for QuantBot
 
@@ -369,7 +359,6 @@ For a financial research platform, this architecture provides several practical 
 
 The result is a system that behaves less like a simple chatbot and more like a modular AI research platform.
 
----
 
 ## A.7 Architectural Philosophy
 
