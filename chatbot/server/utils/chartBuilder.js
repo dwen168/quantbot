@@ -514,8 +514,11 @@ function buildRecommendationCharts(data) {
 
       // 6. Market Backdrop
       kv("market-context", "Market Context", [
-        ["ASX200 Level", fmt(data.market_context?.asx200_level)],
-        ["AUD/USD", fmt(data.market_context?.aud_usd)],
+        ["ASX200 Level",  fmt(data.market_context?.asx200_level)],
+        ["AUD/USD",       fmt(data.market_context?.aud_usd)],
+        ["VIX (Risk)",    fmt(data.market_context?.vix_level)],
+        ["RBA Cash Rate", fmt(data.market_context?.rba_cash_rate, "%")],
+        ["Iron Ore",      fmt(data.market_context?.iron_ore_price, "", "$")],
       ], { description: "Broader market pulse at the time of recommendation.", hideBadges: true }),
     ],
     charts: []

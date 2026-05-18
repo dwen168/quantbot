@@ -73,6 +73,10 @@ def recommend_stock(ticker: str) -> Recommendation:
 
     # Fetch snapshot for market context
     snapshot = get_market_snapshot()
+    
+    # We also want VIX, which is in macro_core but not snapshot
+    from mcp_server.data.macro_core import fetch_macro_core
+    core = fetch_macro_core()
 
     recommendation = Recommendation(
         symbol=analysis.symbol,
@@ -93,7 +97,10 @@ def recommend_stock(ticker: str) -> Recommendation:
         ),
         market_context=MarketContext(
             asx200_level=snapshot.asx_market.asx200_level,
-            aud_usd=snapshot.currencies.aud_usd
+            aud_usd=snapshot.currencies.aud_usd,
+            vix_level=core.vix,
+            rba_cash_rate=snapshot.asx_market.rba_cash_rate,
+            iron_ore_price=snapshot.commodities.iron_ore_etf_proxy
         ),
         key_reasons=reasons[:5],
         key_risks=risks,

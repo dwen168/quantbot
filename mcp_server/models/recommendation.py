@@ -67,6 +67,9 @@ class PriceGuidance(BaseModel):
 class MarketContext(BaseModel):
     asx200_level: float | None = None
     aud_usd: float | None = None
+    vix_level: float | None = None
+    rba_cash_rate: float | None = None
+    iron_ore_price: float | None = None
 
 
 class Recommendation(BaseModel):
