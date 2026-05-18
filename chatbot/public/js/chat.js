@@ -16,7 +16,7 @@ function friendlyTool(tool) {
   return TOOL_LABELS[tool] || tool?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) || null;
 }
 
-function appendMessage(role, html, tool, sessionId) {
+function appendMessage(role, html, tool, sessionId, duration) {
   const log = document.getElementById("chat-log");
   const article = document.createElement("article");
   article.className = `message ${role}`;
@@ -27,12 +27,25 @@ function appendMessage(role, html, tool, sessionId) {
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
-  // Tool chip — shown only for assistant messages with a tool
-  if (tool && role === "assistant") {
-    const chip = document.createElement("div");
-    chip.className = "tool-chip";
-    chip.textContent = friendlyTool(tool);
-    bubble.append(chip);
+  // Meta row for tool chip and duration
+  if (role === "assistant" && (tool || duration)) {
+    const meta = document.createElement("div");
+    meta.className = "message-meta";
+
+    if (tool) {
+      const chip = document.createElement("div");
+      chip.className = "tool-chip";
+      chip.textContent = friendlyTool(tool);
+      meta.append(chip);
+    }
+
+    if (duration) {
+      const timeBadge = document.createElement("div");
+      timeBadge.className = "duration-badge";
+      timeBadge.textContent = `${duration}s`;
+      meta.append(timeBadge);
+    }
+    bubble.append(meta);
   }
 
   const body = document.createElement("div");
@@ -64,30 +77,74 @@ function markdown(text) {
   return marked.parse(text || "");
 }
 
+let providers = {};
+let activeProvider = "ollama";
+let lastSelectedModels = {};
+
 async function loadModels() {
   const select = document.getElementById("model-select");
+  const providerBtns = document.querySelectorAll(".provider-btn");
+  
   try {
     const response = await fetch("/api/models");
     const data = await response.json();
-    const defaultModel = data.defaultModel || "gemma4:e4b";
-    
-    // Clear existing (except default) if needed, but here we just append
-    select.innerHTML = "";
-    
-    for (const model of data.models || []) {
-      const option = document.createElement("option");
-      option.value = model;
-      const isDefault = model === defaultModel;
-      option.textContent = isDefault ? `${model} (Default)` : model;
-      select.append(option);
+    providers = data.providers || {};
+    activeProvider = data.defaultProvider || "ollama";
+    const defaultModel = data.defaultModel;
+
+    // Initialize last selected models with defaults
+    if (data.defaultProvider && data.defaultModel) {
+      lastSelectedModels[data.defaultProvider] = data.defaultModel;
     }
-    
-    if ((data.models || []).includes(defaultModel)) {
-      select.value = defaultModel;
-    }
-  } catch {
-    select.title = "Could not load local Ollama models";
+
+    // Set initial active button
+    providerBtns.forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.provider === activeProvider);
+      // Disable Gemini if not configured (no models)
+      if (btn.dataset.provider === "gemini" && (!providers.gemini || providers.gemini.length === 0)) {
+        btn.style.display = "none";
+      }
+    });
+
+    updateModelSelect(defaultModel);
+  } catch (e) {
+    console.error("Failed to load models", e);
+    select.title = "Could not load models from server";
   }
+}
+
+function updateModelSelect(preferredModel) {
+  const select = document.getElementById("model-select");
+  const models = providers[activeProvider] || [];
+  
+  select.innerHTML = "";
+  if (models.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No models";
+    select.append(option);
+    return;
+  }
+
+  for (const model of models) {
+    const option = document.createElement("option");
+    option.value = model;
+    option.textContent = model;
+    select.append(option);
+  }
+
+  // Restore last selected for this provider, or use preferred, or fallback to first
+  const savedModel = lastSelectedModels[activeProvider];
+  const target = preferredModel || savedModel;
+
+  if (target && models.includes(target)) {
+    select.value = target;
+  } else if (models.length > 0) {
+    select.value = models[0];
+  }
+  
+  // Update saved state
+  lastSelectedModels[activeProvider] = select.value;
 }
 
 
@@ -96,6 +153,24 @@ export function initChat() {
   const form = document.getElementById("chat-form");
   const input = document.getElementById("chat-input");
   const modelSelect = document.getElementById("model-select");
+  const providerBtns = document.querySelectorAll(".provider-btn");
+
+  // Keep track of manual model changes
+  modelSelect.addEventListener("change", () => {
+    lastSelectedModels[activeProvider] = modelSelect.value;
+  });
+
+  // Provider switching
+  providerBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const provider = btn.dataset.provider;
+      if (provider === activeProvider) return;
+      
+      activeProvider = provider;
+      providerBtns.forEach(b => b.classList.toggle("active", b === btn));
+      updateModelSelect();
+    });
+  });
 
   // Make capability examples clickable
   document.querySelectorAll(".cap-item code").forEach(el => {
@@ -126,6 +201,8 @@ export function initChat() {
     appendMessage("user", markdown(message));
     history.push({ role: "user", content: message });
     
+    const startTime = performance.now();
+
     // Professional Progress Indicator
     const typingHtml = `
       <div class="progress-container">
@@ -146,7 +223,8 @@ export function initChat() {
         body: JSON.stringify({
           message,
           history: history.slice(-20),
-          model: modelSelect.value || undefined
+          model: modelSelect.value || undefined,
+          provider: activeProvider
         })
       });
 
@@ -185,11 +263,14 @@ export function initChat() {
               const payload = data.payload;
               typing.remove();
 
+              const endTime = performance.now();
+              const duration = ((endTime - startTime) / 1000).toFixed(1);
+
               // Only assign a session if there is real dashboard content
               const hasDashboard = (payload.charts?.length > 0) || (payload.widgets?.length > 0);
               const sessionId = hasDashboard ? (++sessionIdCounter) : undefined;
 
-              appendMessage("assistant", markdown(payload.message), payload.tool, sessionId);
+              appendMessage("assistant", markdown(payload.message), payload.tool, sessionId, duration);
               history.push({ role: "assistant", content: payload.message });
               while (history.length > 20) history.shift();
 

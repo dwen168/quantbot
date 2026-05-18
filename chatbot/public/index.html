@@ -54,12 +54,18 @@
               <h2>AI Chat</h2>
               <p>Ask about ASX stocks, macro context, or trade ideas</p>
             </div>
-            <label class="model-picker">
-              <span>Model</span>
-              <select id="model-select">
-                <option value="">Server default</option>
-              </select>
-            </label>
+            <div class="chat-header-right">
+              <div class="provider-toggle">
+                <button type="button" class="provider-btn active" data-provider="ollama">Ollama</button>
+                <button type="button" class="provider-btn" data-provider="gemini">Gemini</button>
+              </div>
+              <label class="model-picker">
+                <span>Model</span>
+                <select id="model-select">
+                  <option value="">Server default</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           <div id="chat-log" class="chat-log">

@@ -9,6 +9,7 @@
     "check": "node --check server/index.js && node --check server/routes/chat.js && node --check server/services/intentRouter.js && node --check server/services/mcpClient.js && node --check server/services/llmService.js && node --check server/utils/chartBuilder.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@modelcontextprotocol/sdk": "latest",
     "dotenv": "^16.4.7",
     "express": "^4.18.3",

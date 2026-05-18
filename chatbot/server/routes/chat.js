@@ -55,7 +55,7 @@ function sendSSE(res, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-async function maybeSummarize({ tool, data, model }) {
+async function maybeSummarize({ tool, data, model, provider }) {
   // If the Python tool already provided a narrative, use it!
   if (data && data.narrative && data.narrative !== "Analysis completed. Narrative deferred.") {
     return data.narrative;
@@ -64,13 +64,14 @@ async function maybeSummarize({ tool, data, model }) {
   const base = templateMessage(tool, data);
   const summary = await generateChatSummary({
     model,
+    provider,
     prompt: `Turn this structured QuantBot result into a concise chat answer. Preserve key numbers.\n\n${JSON.stringify({ tool, data }, null, 2).slice(0, 7000)}`
   });
   return summary || base;
 }
 
 router.post("/", async (req, res) => {
-  const { message, model } = req.body || {};
+  const { message, model, provider } = req.body || {};
   
   // Set headers for SSE
   res.writeHead(200, {
@@ -86,7 +87,7 @@ router.post("/", async (req, res) => {
 
   try {
     sendSSE(res, { type: "progress", pct: 15, message: "Identifying intent and ticker..." });
-    const routed = await routeIntent(message);
+    const routed = await routeIntent(message, provider, model);
 
     if (routed.intent === "INVALID_TICKER") {
       sendSSE(res, {
@@ -116,6 +117,7 @@ router.post("/", async (req, res) => {
         } else {
           fallbackMessage = await generateChatSummary({
             model,
+            provider,
             prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
           });
         }
@@ -172,7 +174,7 @@ router.post("/", async (req, res) => {
     const { charts, widgets } = buildDashboard(tool, rawData);
     
     sendSSE(res, { type: "progress", pct: 90, message: "Finalizing AI summary..." });
-    const responseMessage = await maybeSummarize({ tool, data: rawData, model });
+    const responseMessage = await maybeSummarize({ tool, data: rawData, model, provider });
     
     sendSSE(res, { 
       type: "complete", 

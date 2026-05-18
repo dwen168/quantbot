@@ -227,24 +227,52 @@ body.light .chat-pane { background: rgba(255,255,255,0.4); }
   justify-content: space-between;
   background: var(--panel);
   backdrop-filter: var(--glass);
+  gap: 16px;
 }
 
-.chat-header h2, .dashboard-header h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0;
+.chat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.chat-header p, .dashboard-header p {
+.provider-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+}
+
+body.light .provider-toggle {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.provider-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
   color: var(--muted);
-  font-size: 12px;
-  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.provider-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 .model-picker {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  min-width: 120px;
 }
 
 .model-picker span {
@@ -651,7 +679,25 @@ body.light #send-btn {
   background: rgba(96, 165, 250, 0.1);
   border: 1px solid rgba(96, 165, 250, 0.2);
   color: var(--accent);
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.duration-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
 }
 
 .tool-chip.loading::before {

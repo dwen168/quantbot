@@ -10,11 +10,13 @@ from mcp_server.data.yfinance_client import get_ohlcv, get_news
 from mcp_server.models.macro import NewsItem
 
 SECTOR_PROXIES = {
-    "VAS.AX": "Broad Market",
-    "VAP.AX": "Property",
-    "QRE.AX": "Resources",
-    "QFN.AX": "Financials",
-    "ATEC.AX": "Technology",
+    "^AORD": "Broad Market",
+    "^AXFJ": "Financials",
+    "^AXMJ": "Materials",
+    "^AXRE": "Resources",
+    "^AXPJ": "Property",
+    "^AXIJ": "Technology",
+    "^AXHJ": "Health Care",
 }
 
 @dataclass

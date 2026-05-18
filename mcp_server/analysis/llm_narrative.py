@@ -116,5 +116,28 @@ def _anthropic(prompt: str) -> str | None:
         return None
 
 
+def _gemini(prompt: str) -> str | None:
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+    try:
+        model_id = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
+        response = httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "systemInstruction": {"parts": [{"text": "Write concise ASX stock analysis. No financial advice disclaimer."}]}
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        candidates = response.json().get("candidates", [])
+        if candidates:
+            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
+        return None
+    except Exception:
+        return None
+
+
 def generate_narrative(prompt: str, model: str | None = None) -> str | None:
-    return _ollama(prompt, model=model) or _openai(prompt) or _anthropic(prompt)
+    return _ollama(prompt, model=model) or _gemini(prompt) or _openai(prompt) or _anthropic(prompt)

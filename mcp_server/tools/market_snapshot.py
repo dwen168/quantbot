@@ -37,9 +37,18 @@ def _last_close(ticker: str, period: str = "1mo") -> float | None:
 
 def _pct_change(ticker: str, period: str = "1mo", days: int | None = None) -> float | None:
     try:
-        close = get_ohlcv(ticker, period)["Close"].dropna()
+        df = get_ohlcv(ticker, period)
+        if df.empty:
+            return None
+        close = df["Close"].dropna()
         if len(close) < 2:
             return None
+        
+        # For 1D change, we want the difference between the last two available sessions
+        if days == 2:
+            start = close.iloc[-2]
+            return _clean(((close.iloc[-1] - start) / start) * 100)
+            
         start = close.iloc[-days] if days and len(close) >= days else close.iloc[0]
         return _clean(((close.iloc[-1] - start) / start) * 100)
     except Exception:
@@ -51,14 +60,18 @@ def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
         df = get_ohlcv(ticker, period)
         if df.empty:
             return None
+        # Ensure we have clean data for the chart
+        df = df.sort_index().dropna(subset=["Close"])
         series = []
         for index, row in df.iterrows():
+            # Use 'close' as a fallback for missing OHLC for indices
+            close = row["Close"]
             series.append({
                 "time": index.strftime("%Y-%m-%d"),
-                "open": _clean(row["Open"]),
-                "high": _clean(row["High"]),
-                "low": _clean(row["Low"]),
-                "close": _clean(row["Close"])
+                "open": _clean(row.get("Open", close)),
+                "high": _clean(row.get("High", close)),
+                "low": _clean(row.get("Low", close)),
+                "close": _clean(close)
             })
         return series
     except Exception:

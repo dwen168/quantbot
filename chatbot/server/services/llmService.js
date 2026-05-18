@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
@@ -14,40 +15,72 @@ async function fetchJson(url, options = {}) {
   }
 }
 
-let cachedModels = null;
+let cachedOllamaModels = null;
 let lastFetchTime = 0;
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 
-export async function listModels() {
-  if (cachedModels && (Date.now() - lastFetchTime < CACHE_TTL)) {
-    return cachedModels;
+export async function listOllamaModels() {
+  if (cachedOllamaModels && (Date.now() - lastFetchTime < CACHE_TTL)) {
+    return cachedOllamaModels;
   }
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
   try {
     const data = await fetchJson(`${baseUrl}/api/tags`, { timeout: 2500 });
-    cachedModels = (data.models || []).map((model) => model.name).sort();
+    cachedOllamaModels = (data.models || []).map((model) => model.name).sort();
     lastFetchTime = Date.now();
-    return cachedModels;
+    return cachedOllamaModels;
   } catch {
-    return cachedModels || [];
+    return cachedOllamaModels || [];
   }
 }
 
-export async function preferredModel(requestedModel) {
-  const models = await listModels();
+export async function listModels() {
+  const ollama = await listOllamaModels();
+  const gemini = process.env.GOOGLE_API_KEY ? ["gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro"] : [];
+  return { ollama, gemini };
+}
+
+export async function preferredModel(requestedModel, provider = "ollama") {
+  const providers = await listModels();
+  const models = providers[provider] || [];
+  
   if (requestedModel && models.includes(requestedModel)) {
     return requestedModel;
   }
+  
+  if (provider === "gemini") {
+    return "gemini-1.5-flash";
+  }
+  
   if (models.includes("gemma4:e4b")) {
     return "gemma4:e4b";
   }
   return models[0] || process.env.OLLAMA_MODEL || "gemma4:e4b";
 }
 
-export async function generateChatSummary({ prompt, model }) {
+async function generateGeminiSummary({ prompt, model }) {
+  if (!process.env.GOOGLE_API_KEY) return null;
+  
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    const genModel = genAI.getGenerativeModel({ 
+      model: model || "gemini-1.5-flash",
+      systemInstruction: "Write concise, practical ASX market chatbot responses in markdown."
+    });
+
+    const result = await genModel.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (e) {
+    console.error("Gemini generation failed:", e);
+    return null;
+  }
+}
+
+async function generateOllamaSummary({ prompt, model }) {
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-  const targetModel = await preferredModel(model);
-  const models = await listModels();
+  const targetModel = await preferredModel(model, "ollama");
+  const models = await listOllamaModels();
 
   // Put target model first, then the rest
   const modelsToTry = [targetModel, ...models.filter(m => m !== targetModel)];
@@ -58,7 +91,6 @@ export async function generateChatSummary({ prompt, model }) {
       const response = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        timeout: 9000,
         body: JSON.stringify({
           model: currentModel,
           stream: false,
@@ -75,11 +107,62 @@ export async function generateChatSummary({ prompt, model }) {
         }
       }
     } catch (e) {
-      // Continue to next model on network errors or timeouts
       continue;
     }
   }
   return null;
+}
+
+export async function generateJsonCompletion({ prompt, systemInstruction, provider = "ollama", model }) {
+  if (provider === "gemini" || (model && model.startsWith("gemini-"))) {
+    if (!process.env.GOOGLE_API_KEY) return null;
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+      const genModel = genAI.getGenerativeModel({ 
+        model: model || "gemini-1.5-flash",
+        systemInstruction,
+        generationConfig: { responseMimeType: "application/json" }
+      });
+      const result = await genModel.generateContent(prompt);
+      return result.response.text();
+    } catch (e) {
+      console.error("Gemini JSON generation failed:", e);
+      return null;
+    }
+  }
+
+  // Ollama JSON mode
+  const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
+  const targetModel = await preferredModel(model, "ollama");
+  try {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: targetModel,
+        stream: false,
+        format: "json",
+        messages: [
+          { role: "system", content: systemInstruction },
+          { role: "user", content: prompt }
+        ]
+      })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.message?.content;
+    }
+  } catch (e) {
+    console.error("Ollama JSON generation failed:", e);
+  }
+  return null;
+}
+
+export async function generateChatSummary({ prompt, model, provider = "ollama" }) {
+  if (provider === "gemini" || (model && model.startsWith("gemini-"))) {
+    return await generateGeminiSummary({ prompt, model });
+  }
+  return await generateOllamaSummary({ prompt, model });
 }
 
 export function hasOllamaCli() {

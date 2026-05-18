@@ -1,4 +1,4 @@
-import { preferredModel, listModels } from "./llmService.js";
+import { generateJsonCompletion } from "./llmService.js";
 
 // Common words to exclude from ticker extraction (they look like tickers but aren't)
 const EXCLUSIONS = new Set([
@@ -10,7 +10,10 @@ const EXCLUSIONS = new Set([
   "TELL", "WHAT", "WHEN", "WHY", "WHO", "FROM", "THAT", "THIS", "WITH", "INTO",
   "TRADE", "STOCK", "SHARE", "PRICE", "CHART", "SHOW", "GIVE", "VIEW", "CHECK",
   "SHOULD", "COULD", "WOULD", "THINK", "ABOUT", "EVERY", "RECOM", "SCORE",
-  "MACD", "MACRO", "CONTEXT", "INFO", "LIST", "NEWS", "HELP", "WORK"
+  "MACD", "MACRO", "CONTEXT", "INFO", "LIST", "NEWS", "HELP", "WORK",
+  "TODAY", "DAY", "WEEK", "MONTH", "YEAR", "TIME", "LOOK", "GOOD", "BAD",
+  "HIGH", "LOW", "LAST", "NEXT", "VERY", "MUCH", "SOME", "MANY", "MOST",
+  "AM", "IS", "IT", "IF", "ON", "OR", "SO", "UP", "DO", "GO", "MY", "ME", "BE", "BY", "AT", "AN", "AS"
 ]);
 
 const INTENTS = {
@@ -30,152 +33,90 @@ function extractTicker(message) {
   return candidates.reverse().find((c) => !EXCLUSIONS.has(c)) || null;
 }
 
-/**
- * Validates a ticker by checking if it exists on ASX via yfinance.
- * This is a lightweight check using the ticker info.
- */
-async function validateTicker(ticker) {
-  if (!ticker) return false;
-  return true; // Placeholder: structural change first.
-}
-
-async function getIntentWithLLM(message) {
+async function getIntentWithLLM(message, provider, model) {
   const systemPrompt = `You are a classifier for an ASX stock research chatbot.
 Classify the user message into one of these intents:
-- RECOMMENDATION: Actionable trade advice, signals, or "buy/sell/hold" questions for a specific ticker (e.g., "should I buy BHP?", "give me a recommendation for XRO", "trade signals for CBA").
-- ANALYSIS: In-depth research, scoring, or assessment of a stock without asking for a direct trade action (e.g., "analyze MSB", "research for RIO", "stock assessment for FMG").
-- STOCK_QUERY: Raw technical data, prices, or charts (e.g., "price of BHP", "show me CBA chart", "technicals for TLS").
-- MARKET_SNAPSHOT: General market pulse, interest rates, news, commodities, or currencies (e.g., "market today?", "rba rates", "gold price").
-- MACRO_REGIME: Structural economic context and anchors (e.g., "macro regime", "inflation data", "GDP and unemployment").
+- RECOMMENDATION: Actionable trade advice, signals, or "buy/sell/hold" questions for a specific ticker.
+- ANALYSIS: In-depth research, scoring, or assessment of a stock.
+- STOCK_QUERY: Raw technical data, prices, or charts.
+- MARKET_SNAPSHOT: General market pulse, status, "how is the market", interest rates, news, commodities.
+- MACRO_REGIME: Structural economic context, inflation, GDP.
 - UNKNOWN: General chat or unrecognised requests.
 
 Return JSON with "ticker" (2-5 letter symbol or null) and "intent".`;
 
-  const tryParseResult = (content) => {
-    try {
-      const parsed = JSON.parse(content || "{}");
-      const raw = parsed.ticker ? String(parsed.ticker).toUpperCase().replace(/\.AX$/i, "").trim() : null;
-      // Accept any 2–5 letter ticker the LLM returns, NOT in exclusions
-      const ticker = (raw && /^[A-Z]{2,5}[0-9]?[A-Z]?$/.test(raw) && !EXCLUSIONS.has(raw)) ? raw : null;
-      
-      let intent = parsed.intent || INTENTS.UNKNOWN;
-      // Cross-validation: if intent involves a ticker but no ticker found, downgrade or switch
-      if ([INTENTS.STOCK_QUERY, INTENTS.ANALYSIS, INTENTS.RECOMMENDATION].includes(intent) && !ticker) {
-        if (/\b(macro|economy|market|news|interest rate|rba)\b/i.test(message)) {
-          intent = INTENTS.MARKET_SNAPSHOT;
-        } else {
-          intent = INTENTS.UNKNOWN;
-        }
+  try {
+    const content = await generateJsonCompletion({
+      prompt: message,
+      systemInstruction: systemPrompt,
+      provider,
+      model
+    });
+
+    if (!content) return { intent: INTENTS.UNKNOWN, params: {} };
+
+    const parsed = JSON.parse(content);
+    const raw = parsed.ticker ? String(parsed.ticker).toUpperCase().replace(/\.AX$/i, "").trim() : null;
+    const ticker = (raw && /^[A-Z]{2,5}[0-9]?[A-Z]?$/.test(raw) && !EXCLUSIONS.has(raw)) ? raw : null;
+    
+    let intent = parsed.intent || INTENTS.UNKNOWN;
+    
+    // Explicitly catch "market" or "how is the..." for MARKET_SNAPSHOT if LLM is vague
+    if (intent === INTENTS.UNKNOWN || (intent === INTENTS.STOCK_QUERY && !ticker)) {
+      if (/\b(market|status|today|how is|news|snapshot)\b/i.test(message)) {
+        intent = INTENTS.MARKET_SNAPSHOT;
       }
-
-      return { intent, params: ticker ? { ticker } : {} };
-    } catch {
-      return { intent: INTENTS.UNKNOWN, params: {} };
     }
-  };
 
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const { default: OpenAI } = await import("openai");
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const completion = await client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message }
-        ]
-      });
-      return tryParseResult(completion.choices[0]?.message?.content);
-    } catch {
-      return { intent: INTENTS.UNKNOWN, params: {} };
-    }
-  } else {
-    const baseUrl = (process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-    try {
-      const targetModel = await preferredModel();
-      const models = await listModels();
-      const modelsToTry = [targetModel, ...models.filter(m => m !== targetModel)];
-
-      for (const model of modelsToTry) {
-        if (!model) continue;
-        try {
-          const response = await fetch(`${baseUrl}/api/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model,
-              stream: false,
-              format: "json",
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: message }
-              ]
-            })
-          });
-          if (response.ok) {
-            const data = await response.json();
-            return tryParseResult(data.message?.content);
-          }
-        } catch {
-          continue;
-        }
-      }
-      return { intent: INTENTS.UNKNOWN, params: {} };
-    } catch (e) {
-      console.error("Ollama fallback failed:", e);
-      return { intent: INTENTS.UNKNOWN, params: {} };
-    }
+    return { intent, params: ticker ? { ticker } : {} };
+  } catch (e) {
+    console.error("LLM intent routing failed:", e);
+    return { intent: INTENTS.UNKNOWN, params: {} };
   }
 }
 
-export async function routeIntent(message) {
+export async function routeIntent(message, provider, model) {
   const text = String(message || "");
+  const lower = text.toLowerCase();
 
-  const finalizeResult = (result) => {
-    return result;
-  };
+  // 1. FAST PATH: Check for unambiguous global intent keywords FIRST
+  // This prevents words like "IS" or "TODAY" from being caught by ticker logic
+  if (/\b(macro regime|macro anchors|yield curve|risk sentiment|inflation|cpi|gdp)\b/i.test(lower)) {
+    return { intent: INTENTS.MACRO_REGIME, params: {} };
+  }
+  
+  if (/\b(market snapshot|market status|market today|how is the market|market news|market context)\b/i.test(lower)) {
+    return { intent: INTENTS.MARKET_SNAPSHOT, params: {} };
+  }
 
-  // 1. Primary: Use LLM to understand intent and ticker contextually
+  // 2. PRIMARY: Use LLM to understand intent and ticker contextually
   try {
-    const llmResult = await getIntentWithLLM(text);
+    const llmResult = await getIntentWithLLM(text, provider, model);
     if (llmResult.intent !== INTENTS.UNKNOWN) {
-      // Add default parameters if missing
       if (llmResult.intent === INTENTS.STOCK_QUERY && llmResult.params.ticker && !llmResult.params.period) {
         llmResult.params.period = "2y";
       }
-      return finalizeResult(llmResult);
+      return llmResult;
     }
   } catch (err) {
     console.error("LLM intent routing failed, falling back to heuristics:", err);
   }
 
-  // 2. Secondary: Fast-path / Heuristic fallback if LLM is unsure or offline
-  const lower = text.toLowerCase();
-  
-  // Prioritize Macro Keywords before Ticker Extraction in fallback
-  if (/\b(regime|cpi|gdp|unemployment|yield curve|risk sentiment|macro regime|anchors)\b/i.test(text)) {
-    return { intent: INTENTS.MACRO_REGIME, params: {} };
-  }
-  if (/\b(geopolit|trade war|tariff|interest rate|rates|rba|inflation|macro|news|commodit|currency|context|snapshot)\b/i.test(text)) {
+  // 3. HEURISTICS: Fallback logic
+  if (/\b(regime|macro|economy|anchors|snapshot|market|news|interest rate|rba|inflation|rates)\b/i.test(lower)) {
+    if (/\b(regime|macro|anchors)\b/i.test(lower)) return { intent: INTENTS.MACRO_REGIME, params: {} };
     return { intent: INTENTS.MARKET_SNAPSHOT, params: {} };
   }
 
   const ticker = extractTicker(text);
-  // RECOMMENDATION: Strong trade-action keywords
-  if (ticker && /\b(recommend|buy|sell|hold|should i|shall i|trade|signal|target|stop loss|is .* buy)\b/i.test(text)) {
-    return finalizeResult({ intent: INTENTS.RECOMMENDATION, params: { ticker } });
-  }
-  // ANALYSIS: Deep research or assessment keywords
-  if (ticker && /\b(analy[sz]e|analysis|assess|score|research|evaluate|rating)\b/i.test(text)) {
-    return finalizeResult({ intent: INTENTS.ANALYSIS, params: { ticker } });
-  }
-  // STOCK_QUERY: Raw data, charts, or indicators
-  if (ticker && /\b(price|chart|technical|indicator|52 week|p\/e|pe|rsi|macd|trend|volume|tell me)\b/i.test(lower)) {
-    return finalizeResult({ intent: INTENTS.STOCK_QUERY, params: { ticker, period: "2y" } });
-  }
   if (ticker) {
-    return finalizeResult({ intent: INTENTS.STOCK_QUERY, params: { ticker, period: "2y" } });
+    if (/\b(recommend|buy|sell|hold|should i|trade|signal|target|stop)\b/i.test(lower)) {
+      return { intent: INTENTS.RECOMMENDATION, params: { ticker } };
+    }
+    if (/\b(analy[sz]e|analysis|assess|score|research|evaluate|rating)\b/i.test(lower)) {
+      return { intent: INTENTS.ANALYSIS, params: { ticker } };
+    }
+    return { intent: INTENTS.STOCK_QUERY, params: { ticker, period: "2y" } };
   }
 
   return { intent: INTENTS.UNKNOWN, params: {} };
