@@ -44,7 +44,7 @@ def _key_levels(prices: list[float], current: float | None, atr: float | None = 
     )
 
 
-def analyze_stock(ticker: str, include_narrative: bool = True) -> StockAnalysis:
+def analyze_stock(ticker: str, include_narrative: bool = True, model: str | None = None, provider: str | None = None) -> StockAnalysis:
     symbol = normalize_asx_ticker(ticker)
     technical = get_technical_indicators(ticker, "2y")
     regime = get_macro_regime(include_narrative=False)
@@ -110,6 +110,6 @@ def analyze_stock(ticker: str, include_narrative: bool = True) -> StockAnalysis:
             f"Summarise {analysis.symbol} in 4 sentences. Combined score {analysis.scores.combined_score}. "
             f"Bullish: {[s.factor for s in analysis.bullish_signals]}. Bearish: {[s.factor for s in analysis.bearish_signals]}. Risks: {[s.factor for s in analysis.risk_factors]}."
         )
-        analysis.narrative = generate_narrative(prompt)
+        analysis.narrative = generate_narrative(prompt, model=model, provider=provider)
     
     return analysis

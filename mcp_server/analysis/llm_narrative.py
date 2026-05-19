@@ -26,7 +26,7 @@ def _ollama_model() -> str:
             return _MODEL_CACHE
             
         # 2. Priority list of reliable models known to be functional on this machine
-        priorities = ["llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
+        priorities = ["gemma4:e4b", "llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
         for m in priorities:
             if m in available_models:
                 _MODEL_CACHE = m
@@ -139,5 +139,16 @@ def _gemini(prompt: str) -> str | None:
         return None
 
 
-def generate_narrative(prompt: str, model: str | None = None) -> str | None:
+def generate_narrative(prompt: str, model: str | None = None, provider: str | None = None) -> str | None:
+    # If provider is explicitly specified, try that first
+    if provider == "ollama":
+        return _ollama(prompt, model=model)
+    if provider == "gemini":
+        return _gemini(prompt)
+    if provider == "openai":
+        return _openai(prompt)
+    if provider == "anthropic":
+        return _anthropic(prompt)
+
+    # Fallback to the original priority list
     return _ollama(prompt, model=model) or _gemini(prompt) or _openai(prompt) or _anthropic(prompt)

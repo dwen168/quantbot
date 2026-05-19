@@ -28,7 +28,7 @@ def _risk_level(score: int, bearish_count: int) -> str:
     return "LOW"
 
 
-def recommend_stock(ticker: str) -> Recommendation:
+def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None) -> Recommendation:
     analysis = analyze_stock(ticker, include_narrative=False)
     score = analysis.scores.combined_score
     action, conviction = _decision(score)
@@ -111,5 +111,5 @@ def recommend_stock(ticker: str) -> Recommendation:
         f"Conviction {recommendation.conviction}%, risk {recommendation.risk_level}. "
         f"Reasons: {[r.factor for r in recommendation.key_reasons]}. Risks: {[r.factor for r in recommendation.key_risks]}."
     )
-    recommendation.narrative = generate_narrative(prompt)
+    recommendation.narrative = generate_narrative(prompt, model=model, provider=provider)
     return recommendation

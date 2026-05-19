@@ -27,21 +27,21 @@ def get_market_snapshot() -> dict:
 
 
 @mcp.tool()
-def get_macro_regime() -> dict:
+def get_macro_regime(model: str | None = None, provider: str | None = None) -> dict:
     """Return structural economic signals and regime context used for analysis and scoring."""
-    return get_macro_regime_impl().model_dump()
+    return get_macro_regime_impl(model=model, provider=provider).model_dump()
 
 
 @mcp.tool()
-def analyze_stock(ticker: str) -> dict:
+def analyze_stock(ticker: str, model: str | None = None, provider: str | None = None) -> dict:
     """Synthesize technical and macro data into a structured stock analysis."""
-    return analyze_stock_impl(ticker).model_dump()
+    return analyze_stock_impl(ticker, model=model, provider=provider).model_dump()
 
 
 @mcp.tool()
-def recommend_stock(ticker: str) -> dict:
+def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None) -> dict:
     """Convert stock analysis into a buy, sell, or hold recommendation."""
-    return recommend_stock_impl(ticker).model_dump()
+    return recommend_stock_impl(ticker, model=model, provider=provider).model_dump()
 
 
 def main() -> None:

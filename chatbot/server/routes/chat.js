@@ -151,7 +151,7 @@ router.post("/", async (req, res) => {
     }
 
     sendSSE(res, { type: "progress", pct: 40, message: `Requesting ${tool.replace(/_/g, " ")} data...` });
-    const params = { ...routed.params };
+    const params = { ...routed.params, model, provider };
     if (tool === "get_technical_indicators" && !params.period) {
       params.period = "2y";
     }

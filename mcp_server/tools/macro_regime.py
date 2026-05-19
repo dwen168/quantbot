@@ -47,7 +47,7 @@ def _vix_regime(vix: float | None) -> str:
 
 from mcp_server.analysis.llm_narrative import generate_narrative
 
-def get_macro_regime(include_narrative: bool = True) -> MacroRegime:
+def get_macro_regime(include_narrative: bool = True, model: str | None = None, provider: str | None = None) -> MacroRegime:
     """
     Step 4: New analysis-oriented tool.
     Focuses on 'What is underlying economic environment?'
@@ -147,7 +147,7 @@ def get_macro_regime(include_narrative: bool = True) -> MacroRegime:
             f"2. Provide a 1-sentence assessment of GEOPOLITICAL RISK if relevant (wars, trade issues). If none, say 'No significant geopolitical escalation detected.'\n"
             f"Format: Separate the two sections with a [GEO] delimiter."
         )
-        llm_output = generate_narrative(prompt)
+        llm_output = generate_narrative(prompt, model=model, provider=provider)
         
         if llm_output:
             if "[GEO]" in llm_output:
