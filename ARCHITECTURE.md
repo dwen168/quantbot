@@ -4,8 +4,15 @@ This document describes the high-level architecture, service relationships, and 
 
 ## 1. System Overview
 
-QuantBot is a multi-layered application designed for professional ASX stock analysis. it follows a **Decoupled Orchestration** pattern where a Node.js server acts as the "Brain" (UI, Routing, Streaming, Model Selection, Dashboard Assemebly) and a Python MCP server acts as the "Specialist" (Data, Scoring, Quantitative Analysis).
+QuantBot is a multi-layered application designed for professional ASX stock analysis. It follows a **Decoupled Orchestration** pattern where a Node.js server acts as the "Brain" (UI, Routing, Streaming, Model Selection, Dashboard Assembly) and a Python MCP server acts as the "Specialist" (Data, Scoring, Quantitative Analysis).
 
+```mermaid
+flowchart LR
+    User((User)) <--> UI["Frontend<br/>(Glassmorphism UI)"]
+    UI <--> Brain["Node.js Orchestrator<br/>(The Brain)"]
+    Brain <--> Specialist["Python MCP Server<br/>(The Specialist)"]
+    Specialist <--> Data[("Market &<br/>Economic Data")]
+```
 
 ## 2. High-Level Components
 
@@ -129,6 +136,90 @@ flowchart LR
 
 ## 3. Data Flow & Routing
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend (JS)
+    participant B as Node.js (Brain)
+    participant M as MCP (Specialist)
+    participant D as Data (External)
+
+    U->>F: Types "Should I buy BHP?"
+    F->>B: POST /api/chat (SSE Stream)
+    activate B
+    B->>B: Intent Classification (BHP, RECOMMENDATION)
+    B->>M: Call tool: recommend_stock(ticker="BHP")
+    activate M
+    M->>D: Fetch Prices (yFinance)
+    M->>D: Fetch Macro Data (RBA/ABS)
+    D-->>M: Raw Data
+    M->>M: Quantitative Scoring & Analysis
+    M-->>B: Structured Analysis Payload
+    deactivate M
+    B->>B: ChartBuilder: Transform to UI Widgets
+    B->>B: LLMService: Generate Chat Narrative
+    B-->>F: Stream: Progress Updates (25%, 50%, 100%)
+    B-->>F: Stream: Complete Event (Text + Widgets)
+    deactivate B
+    F->>F: Dashboard.js: Render Charts & Tables
+    F-->>U: Displays Response & Interactive Dashboard
+```
+
+### Internal MCP Lifecycle
+
+When the MCP Server receives a tool call, it follows this layered deterministic pipeline across its modular components:
+
+```mermaid
+flowchart LR
+    Entry["server.py<br/>(FastMCP Entry)"]
+
+    subgraph ToolLayer ["Tool Layer"]
+        direction TB
+        T_Anal["Analyze Stock"] ~~~ T_Rec["Recommend Stock"] ~~~ T_Tech["Technical Indicators"] ~~~ T_Snap["Market Snapshot"] ~~~ T_Mac["Macro Regime"]
+    end
+
+    subgraph AggLayer ["Aggregation Layer"]
+        MC["MacroCore<br/>(Parallel Fetcher)"]
+    end
+
+    subgraph DAL ["Data Access Layer"]
+        YF["yFinance Client"]
+        RBA["RBA Client"]
+        ABS["ABS Client"]
+    end
+
+    subgraph QuantLayer ["Quantitative Engines"]
+        SE["Scoring Engine<br/>(scoring.py)"]
+    end
+
+    subgraph NarrativeLayer ["Narrative Layer"]
+        NE["Narrative Engine<br/>(llm_narrative.py)"]
+    end
+
+    subgraph ContractLayer ["Contract Layer"]
+        PM["Pydantic Models<br/>(models/*.py)"]
+    end
+
+    Entry -- "JSON-RPC Tool Call" --> ToolLayer
+    
+    ToolLayer -- "1. OHLCV Request" --> YF
+    YF -- "Prices/News" --> ToolLayer
+    
+    ToolLayer -- "2. Context Request" --> AggLayer
+    AggLayer -- "Parallel Fetch" --> DAL
+    DAL -- "Rates/Commodity/VIX" --> AggLayer
+    AggLayer -- "Aggregated Data" --> ToolLayer
+    
+    ToolLayer -- "3. Factor Analysis Request" --> QuantLayer
+    QuantLayer -- "Multi-factor Scores" --> ToolLayer
+    
+    ToolLayer -- "4. Generate Narrative Request" --> NarrativeLayer
+    NarrativeLayer -- "AI Research Text" --> ToolLayer
+    
+    ToolLayer -- "5. Validate Schema" --> ContractLayer
+    ContractLayer -- "Structured Result" --> Entry
+```
+
 1. **Initiation**: `app.js` initializes the layout and theme. User types "Should I buy BHP?" in the chat input.
 2. **Streaming Request**: `chat.js` sends a request to `POST /api/chat` and immediately begins reading the response body as a `ReadableStream` for real-time SSE updates.
 3. **Intent Classification**: `server/routes/chat.js` passes the query to `intentRouter.js`, which identifies the `RECOMMENDATION` intent and extracts the ticker `BHP`.
@@ -182,7 +273,7 @@ flowchart LR
 
 * **Local First**: Designed to run locally with minimal external dependencies besides the data APIs.
 * **Theme Persistence**: User theme preferences (Light/Dark) are persisted in the browser's `localStorage`.
-* **Cashing**: RBA and ABS metrics are cached via Python's `lru_cache` to minimize network overhead.
+* **Caching**: RBA and ABS metrics are cached via Python's `lru_cache` to minimize network overhead.
 
 ---
 
