@@ -31,6 +31,20 @@
             <span class="topbar-tagline">ASX Intelligence Platform</span>
           </div>
         </div>
+
+        <div class="topbar-settings">
+          <div class="provider-toggle">
+            <button type="button" class="provider-btn active" data-provider="ollama">Ollama</button>
+            <button type="button" class="provider-btn" data-provider="gemini">Gemini</button>
+          </div>
+          <label class="model-picker">
+            <span>Model</span>
+            <select id="model-select">
+              <option value="">Server default</option>
+            </select>
+          </label>
+        </div>
+
         <div class="topbar-actions">
           <div class="topbar-status">
             <span class="status-dot"></span>
@@ -54,64 +68,64 @@
               <h2>AI Chat</h2>
               <p>Ask about ASX stocks, macro context, or trade ideas</p>
             </div>
-            <div class="chat-header-right">
-              <div class="provider-toggle">
-                <button type="button" class="provider-btn active" data-provider="ollama">Ollama</button>
-                <button type="button" class="provider-btn" data-provider="gemini">Gemini</button>
-              </div>
-              <label class="model-picker">
-                <span>Model</span>
-                <select id="model-select">
-                  <option value="">Server default</option>
-                </select>
-              </label>
-            </div>
           </div>
 
           <div id="chat-log" class="chat-log">
             <article class="message assistant">
               <div class="bubble">
                 <div class="welcome-header">
-                  <div class="welcome-icon">⚡</div>
-                  <strong>Welcome to QuantBot</strong>
+                  <div class="welcome-title">
+                    <div class="welcome-icon">⚡</div>
+                    <strong>Welcome to QuantBot</strong>
+                  </div>
                   <p>Your AI-powered co-pilot for the Australian stock market. I combine real-time technical data, macro signals, and news intelligence to help you make better decisions.</p>
                 </div>
                 
                 <div class="capabilities-grid">
                   <div class="cap-item">
-                    <span class="cap-icon">📰</span>
-                    <strong>Market Pulse</strong>
+                    <div class="cap-item-header">
+                      <span class="cap-icon">📰</span>
+                      <strong>Market Pulse</strong>
+                    </div>
                     <p>ASX200, sectors, commodities & macro signals</p>
                     <code>"How is the market today?"</code>
                   </div>
                   <div class="cap-item">
-                    <span class="cap-icon">🔬</span>
-                    <strong>Deep Analysis</strong>
+                    <div class="cap-item-header">
+                      <span class="cap-icon">🔬</span>
+                      <strong>Deep Analysis</strong>
+                    </div>
                     <p>Technicals + fundamentals + macro context</p>
                     <code>"Analyze CBA"</code>
                   </div>
                   <div class="cap-item">
-                    <span class="cap-icon">📊</span>
-                    <strong>Technicals</strong>
+                    <div class="cap-item-header">
+                      <span class="cap-icon">📊</span>
+                      <strong>Technicals</strong>
+                    </div>
                     <p>RSI, MACD, Trend, ATR support levels</p>
                     <code>"Technicals for BHP"</code>
                   </div>
                   <div class="cap-item">
-                    <span class="cap-icon">🌐</span>
-                    <strong>Macro Regime</strong>
+                    <div class="cap-item-header">
+                      <span class="cap-icon">🌐</span>
+                      <strong>Macro Regime</strong>
+                    </div>
                     <p>Rate regimes, risk environment, and cycles</p>
                     <code>"Macro Regime"</code>
                   </div>
                   <div class="cap-item">
-                    <span class="cap-icon">⭐</span>
-                    <strong>Trade Ideas</strong>
+                    <div class="cap-item-header">
+                      <span class="cap-icon">⭐</span>
+                      <strong>Trade Ideas</strong>
+                    </div>
                     <p>AI recommendations with conviction scores</p>
                     <code>"Should I buy FMG?"</code>
                   </div>
                 </div>
 
                 <p class="welcome-footer">
-                  <em>Data via Yahoo Finance &amp; RBA · 20min delay</em>
+                  <em>Intelligence via Yahoo Finance, RBA &amp; ABS · Market data 20m delay</em>
                 </p>
               </div>
             </article>

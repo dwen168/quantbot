@@ -1,4 +1,4 @@
-import { render as renderDashboard, highlightDashboardSession, clearDashboard } from "./dashboard.js";
+import { render as renderDashboard, highlightDashboardSession, clearDashboard, showSkeletons, clearSkeletons } from "./dashboard.js";
 
 const history = [];
 let sessionIdCounter = 0;
@@ -201,6 +201,9 @@ export function initChat() {
     appendMessage("user", markdown(message));
     history.push({ role: "user", content: message });
     
+    // Show skeleton loading state in dashboard
+    showSkeletons();
+    
     const startTime = performance.now();
 
     // Professional Progress Indicator
@@ -232,6 +235,7 @@ export function initChat() {
         // SSE might not have started yet, handle immediate error
         const data = await response.json().catch(() => ({}));
         typing.remove();
+        clearSkeletons();
         appendMessage("assistant", markdown(`**Error:** ${data.error || "Request failed."}`));
         return;
       }
@@ -262,6 +266,7 @@ export function initChat() {
             else if (data.type === "complete") {
               const payload = data.payload;
               typing.remove();
+              clearSkeletons();
 
               const endTime = performance.now();
               const duration = ((endTime - startTime) / 1000).toFixed(1);
@@ -280,6 +285,7 @@ export function initChat() {
             }
             else if (data.type === "error") {
               typing.remove();
+              clearSkeletons();
               appendMessage("assistant", markdown(`**Error:** ${data.error || "Request failed."}`));
             }
           } catch (e) {
@@ -289,6 +295,7 @@ export function initChat() {
       }
     } catch (error) {
       typing.remove();
+      clearSkeletons();
       appendMessage("assistant", markdown(`**Error:** ${error.message}`));
     }
   });

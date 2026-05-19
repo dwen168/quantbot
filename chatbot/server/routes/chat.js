@@ -61,11 +61,31 @@ async function maybeSummarize({ tool, data, model, provider }) {
     return data.narrative;
   }
 
+  // Optimization: Remove large historical price series from the data sent to the LLM.
+  // The LLM only needs the high-level metrics and signals to summarize,
+  // while the full series is still sent to the frontend for chart rendering.
+  const makeLiteData = (obj) => {
+    if (Array.isArray(obj)) {
+      return obj.map(makeLiteData);
+    } else if (obj !== null && typeof obj === 'object') {
+      const lite = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (['series', 'price_series', 'trend_labels', 'trend_datasets'].includes(key) || key.endsWith('_series')) {
+          continue;
+        }
+        lite[key] = makeLiteData(value);
+      }
+      return lite;
+    }
+    return obj;
+  };
+
+  const liteData = makeLiteData(data);
   const base = templateMessage(tool, data);
   const summary = await generateChatSummary({
     model,
     provider,
-    prompt: `Turn this structured QuantBot result into a concise chat answer. Preserve key numbers.\n\n${JSON.stringify({ tool, data }, null, 2).slice(0, 7000)}`
+    prompt: `Turn this structured QuantBot result into a concise chat answer. Preserve key numbers.\n\n${JSON.stringify({ tool, data: liteData }, null, 2).slice(0, 10000)}`
   });
   return summary || base;
 }
