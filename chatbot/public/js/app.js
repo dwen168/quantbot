@@ -38,6 +38,30 @@ function initResize() {
   });
 }
 
+function initModal() {
+  const openBtn = document.getElementById("how-it-works-btn");
+  const closeBtn = document.getElementById("modal-close");
+  const overlay = document.getElementById("modal-overlay");
+
+  if (!openBtn || !closeBtn || !overlay) return;
+
+  const toggle = (active) => {
+    overlay.classList.toggle("active", active);
+    document.body.style.overflow = active ? "hidden" : "";
+  };
+
+  openBtn.addEventListener("click", () => toggle(true));
+  closeBtn.addEventListener("click", () => toggle(false));
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) toggle(false);
+  });
+  
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("active")) toggle(false);
+  });
+}
+
 initTheme();
 initResize();
+initModal();
 initChat();

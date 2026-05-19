@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Try loading from current dir, then chatbot/ dir as fallback for user keys
+load_dotenv()
+load_dotenv(Path(__file__).parent.parent / "chatbot" / ".env")
+
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.analysis import analyze_stock as analyze_stock_impl

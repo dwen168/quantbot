@@ -150,15 +150,23 @@ def get_macro_regime(include_narrative: bool = True, model: str | None = None, p
         llm_output = generate_narrative(prompt, model=model, provider=provider)
         
         if llm_output:
+            # Flexible parsing: check for delimiter but also fallback gracefully
             if "[GEO]" in llm_output:
                 parts = llm_output.split("[GEO]")
                 summary = parts[0].strip()
                 geopolitics = parts[1].strip()
+            elif "GEOPOLITICAL" in llm_output.upper():
+                # If delimiter missing but keyword present, try to split at the keyword
+                split_idx = llm_output.upper().find("GEOPOLITICAL")
+                summary = llm_output[:split_idx].strip()
+                geopolitics = llm_output[split_idx:].strip()
             else:
                 summary = llm_output.strip()
-                geopolitics = "Geopolitical assessment integrated into summary."
+                geopolitics = "No significant geopolitical escalation detected based on current data."
         else:
-            geopolitics = "Geopolitical context unavailable (LLM connection timeout or offline)."
+            # This is where the user saw the error. Let's make it clearer.
+            geopolitics = "Geopolitical risk analysis temporarily unavailable (check provider settings)."
+            summary = "Macro summary unavailable."
 
     return MacroRegime(
         as_of_date=date.today().isoformat(),

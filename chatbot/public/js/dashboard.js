@@ -569,7 +569,22 @@ function renderScoreHero(widget) {
   const tcStr = techContrib  > 0 ? `+${techContrib}`  : String(techContrib);
   const mcStr = macroContrib > 0 ? `+${macroContrib}` : String(macroContrib);
 
+  // Added Stock Identity Header
+  const stockHeaderHtml = widget.symbol ? `
+    <div class="sh-stock-header">
+      <div class="sh-stock-identity">
+        <span class="sh-stock-symbol">${widget.symbol}</span>
+        <span class="sh-stock-name">${widget.companyName || ""}</span>
+      </div>
+      <div class="sh-stock-price">
+        <span class="sh-price-val">${widget.price != null ? '$' + widget.price : ""}</span>
+        <span class="sh-price-label">Last Quote</span>
+      </div>
+    </div>
+  ` : "";
+
   card.innerHTML = `
+    ${stockHeaderHtml}
     <div class="sh-top">
       <div class="sh-verdict-block">
         <span class="sh-eyebrow">Research Verdict</span>
@@ -991,7 +1006,7 @@ export function showSkeletons() {
   `;
   container.append(kv);
 
-  dashboard.prepend(container);
+  dashboard.append(container);
   
   requestAnimationFrame(() => {
     container.scrollIntoView({ behavior: "smooth", block: "start" });

@@ -9,41 +9,42 @@ import httpx
 
 _MODEL_CACHE: str | None = None
 
+def _get_available_ollama_models() -> list[str]:
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    try:
+        response = httpx.get(f"{base_url}/api/tags", timeout=3)
+        if response.status_code == 200:
+            return [m["name"] for m in response.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
 def _ollama_model() -> str:
     global _MODEL_CACHE
     if _MODEL_CACHE:
         return _MODEL_CACHE
 
     env_model = os.getenv("OLLAMA_MODEL")
-    try:
-        # Get list of available models
-        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=3, check=False)
-        available_models = result.stdout
+    available_models = _get_available_ollama_models()
+    
+    # 1. If environment variable model is explicitly set and available, use it
+    if env_model and any(env_model in m for m in available_models):
+        _MODEL_CACHE = env_model
+        return _MODEL_CACHE
         
-        # 1. If environment variable model is explicitly set and available, use it
-        if env_model and env_model in available_models:
-            _MODEL_CACHE = env_model
-            return _MODEL_CACHE
-            
-        # 2. Priority list of reliable models known to be functional on this machine
-        priorities = ["gemma4:e4b", "llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
-        for m in priorities:
-            if m in available_models:
+    # 2. Priority list of reliable models known to be functional on this machine
+    priorities = ["gemma4:e4b", "llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
+    for p in priorities:
+        # Check for exact match or versioned match
+        for m in available_models:
+            if m == p or m.startswith(f"{p}:") or p.startswith(f"{m}:"):
                 _MODEL_CACHE = m
                 return _MODEL_CACHE
                 
-        # 3. Fallback to gemma4:e4b if nothing else
-        if "gemma4:e4b" in available_models:
-            _MODEL_CACHE = "gemma4:e4b"
-            return _MODEL_CACHE
-            
-        # 4. Last resort: first model in the list (skip header)
-        lines = available_models.strip().split("\n")
-        if len(lines) > 1:
-            _MODEL_CACHE = lines[1].split()[0]
-            return _MODEL_CACHE
-    except Exception:
-        pass
+    # 3. Last resort: first model in the list
+    if available_models:
+        _MODEL_CACHE = available_models[0]
+        return _MODEL_CACHE
     
     _MODEL_CACHE = env_model or "gemma3:4b"
     return _MODEL_CACHE
@@ -51,50 +52,89 @@ def _ollama_model() -> str:
 
 def _ollama(prompt: str, model: str | None = None) -> str | None:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    try:
-        response = httpx.post(
-            f"{base_url}/api/chat",
-            json={
-                "model": model or _ollama_model(),
-                "messages": [
-                    {"role": "system", "content": "Write concise ASX stock analysis. No financial advice disclaimer."},
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        return response.json().get("message", {}).get("content")
-    except Exception:
-        return None
+    
+    # If a specific model is requested, try ONLY that model first
+    # If no model requested, use the best one we can find
+    models_to_try = [model] if model else []
+    if not model:
+        models_to_try.append(_ollama_model())
+        
+    # Also add fallbacks from our priority list if the primary one fails
+    priorities = ["gemma4:e4b", "llama3.1:8b", "gemma3:4b", "qwen3.5:9b"]
+    for p in priorities:
+        if p not in models_to_try:
+            models_to_try.append(p)
+
+    available_models = _get_available_ollama_models()
+    
+    for target_model in models_to_try:
+        if not target_model: continue
+        
+        # Verify model exists before trying
+        if not any(target_model in m for m in available_models) and target_model not in priorities:
+            continue
+
+        try:
+            response = httpx.post(
+                f"{base_url}/api/chat",
+                json={
+                    "model": target_model,
+                    "messages": [
+                        {"role": "system", "content": "Write concise ASX stock analysis. No financial advice disclaimer."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "stream": False,
+                },
+                timeout=30,
+            )
+            if response.status_code == 200:
+                return response.json().get("message", {}).get("content")
+            
+            error_data = response.json() if response.headers.get("Content-Type") == "application/json" else {"error": response.text}
+            print(f"Ollama error ({target_model}): {error_data.get('error')}", file=os.sys.stderr)
+            
+            # If the error is about loading the model, try the next one
+            if "unable to load model" in str(error_data.get("error")).lower():
+                continue
+            else:
+                # For other errors (like prompt too long), we might still want to try fallbacks
+                continue
+                
+        except Exception as e:
+            print(f"Ollama connection error ({target_model}): {e}", file=os.sys.stderr)
+            continue
+            
+    return None
 
 
-def _openai(prompt: str) -> str | None:
+def _openai(prompt: str, model: str | None = None) -> str | None:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
+    target_model = model if (model and not model.startswith("gemini-") and not model.startswith("claude-")) else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     try:
         response = httpx.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "model": target_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 220,
+                "max_tokens": 250,
             },
             timeout=30,
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
-    except Exception:
+    except Exception as e:
+        print(f"OpenAI error ({target_model}): {e}", file=os.sys.stderr)
         return None
 
 
-def _anthropic(prompt: str) -> str | None:
+def _anthropic(prompt: str, model: str | None = None) -> str | None:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return None
+    target_model = model if (model and model.startswith("claude-")) else os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
     try:
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",
@@ -103,8 +143,8 @@ def _anthropic(prompt: str) -> str | None:
                 "anthropic-version": "2023-06-01",
             },
             json={
-                "model": os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest"),
-                "max_tokens": 220,
+                "model": target_model,
+                "max_tokens": 250,
                 "messages": [{"role": "user", "content": prompt}],
             },
             timeout=30,
@@ -112,18 +152,25 @@ def _anthropic(prompt: str) -> str | None:
         response.raise_for_status()
         content: list[dict[str, Any]] = response.json().get("content", [])
         return "".join(block.get("text", "") for block in content if block.get("type") == "text") or None
-    except Exception:
+    except Exception as e:
+        print(f"Anthropic error ({target_model}): {e}", file=os.sys.stderr)
         return None
 
 
-def _gemini(prompt: str) -> str | None:
+def _gemini(prompt: str, model: str | None = None) -> str | None:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return None
+    
+    # Correcting model ID logic: if 'model' looks like a gemini model, use it. 
+    # Otherwise use default or env.
+    target_model = model if (model and model.startswith("gemini-")) else os.getenv("GOOGLE_MODEL", "gemini-1.5-flash")
+    
     try:
-        model_id = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
+        # Use v1 stable API instead of v1beta if possible, or ensure correct v1beta usage
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
         response = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}",
+            url,
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
                 "systemInstruction": {"parts": [{"text": "Write concise ASX stock analysis. No financial advice disclaimer."}]}
@@ -135,20 +182,37 @@ def _gemini(prompt: str) -> str | None:
         if candidates:
             return candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
         return None
-    except Exception:
+    except Exception as e:
+        print(f"Gemini error ({target_model}): {e}", file=os.sys.stderr)
         return None
 
 
 def generate_narrative(prompt: str, model: str | None = None, provider: str | None = None) -> str | None:
-    # If provider is explicitly specified, try that first
-    if provider == "ollama":
-        return _ollama(prompt, model=model)
-    if provider == "gemini":
-        return _gemini(prompt)
-    if provider == "openai":
-        return _openai(prompt)
-    if provider == "anthropic":
-        return _anthropic(prompt)
+    """
+    Main entry point for generating AI narratives.
+    Prioritizes the explicitly requested provider if available.
+    """
+    # Normalize provider string
+    p = (provider or "").lower()
+    
+    # 1. Attempt the requested provider
+    if p == "ollama":
+        res = _ollama(prompt, model=model)
+        if res: return res
+    elif p == "gemini":
+        res = _gemini(prompt, model=model)
+        if res: return res
+    elif p == "openai":
+        res = _openai(prompt, model=model)
+        if res: return res
+    elif p == "anthropic":
+        res = _anthropic(prompt, model=model)
+        if res: return res
 
-    # Fallback to the original priority list
-    return _ollama(prompt, model=model) or _gemini(prompt) or _openai(prompt) or _anthropic(prompt)
+    # 2. If requested provider failed or none requested, try fallbacks in order of cost/locality
+    return (
+        _ollama(prompt, model=model) or 
+        _gemini(prompt, model=model) or 
+        _openai(prompt, model=model) or 
+        _anthropic(prompt, model=model)
+    )

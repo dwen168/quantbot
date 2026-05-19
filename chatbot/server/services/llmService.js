@@ -49,13 +49,19 @@ export async function preferredModel(requestedModel, provider = "ollama") {
   }
   
   if (provider === "gemini") {
-    return "gemini-1.5-flash";
+    return requestedModel || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
+  }
+  
+  // Consistency: First priority should be the OLLAMA_MODEL from .env
+  const envModel = process.env.OLLAMA_MODEL;
+  if (envModel && models.includes(envModel)) {
+    return envModel;
   }
   
   if (models.includes("gemma4:e4b")) {
     return "gemma4:e4b";
   }
-  return models[0] || process.env.OLLAMA_MODEL || "gemma4:e4b";
+  return models[0] || "gemma4:e4b";
 }
 
 async function generateGeminiSummary({ prompt, model }) {
@@ -63,8 +69,9 @@ async function generateGeminiSummary({ prompt, model }) {
   
   try {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    const targetModel = model || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
     const genModel = genAI.getGenerativeModel({ 
-      model: model || "gemini-1.5-flash",
+      model: targetModel,
       systemInstruction: "Write concise, practical ASX market chatbot responses in markdown."
     });
 
@@ -118,8 +125,9 @@ export async function generateJsonCompletion({ prompt, systemInstruction, provid
     if (!process.env.GOOGLE_API_KEY) return null;
     try {
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+      const targetModel = model || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
       const genModel = genAI.getGenerativeModel({ 
-        model: model || "gemini-1.5-flash",
+        model: targetModel,
         systemInstruction,
         generationConfig: { responseMimeType: "application/json" }
       });

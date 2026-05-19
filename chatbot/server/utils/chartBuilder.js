@@ -330,10 +330,13 @@ function buildAnalysisCharts(data) {
     widgets: [
       { id: "analysis-banner", type: "banner", text: "🔬 Deep Analysis" },
 
-      // 1. Score Hero — verdict, score, formula
+      // Unified Header: Stock Identity + Research Verdict
       {
         id: "combined-score-hero",
         type: "score-hero",
+        symbol: data.symbol,
+        companyName: data.company_name,
+        price: data.last_price,
         combinedScore,
         techScore,
         macroScore,
@@ -341,7 +344,7 @@ function buildAnalysisCharts(data) {
         bearishCount: techBearish.length + macroRisks.length
       },
 
-      // 2. Technical Assessment — Flattened into 3 columns
+      // 1. Technical Assessment — Flattened into 3 columns
       {
         id: "technical-assessment-flattened",
         type: "group",

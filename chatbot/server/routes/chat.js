@@ -56,23 +56,34 @@ function sendSSE(res, data) {
 }
 
 async function maybeSummarize({ tool, data, model, provider }) {
-  // If the Python tool already provided a narrative, use it!
-  if (data && data.narrative && data.narrative !== "Analysis completed. Narrative deferred.") {
-    return data.narrative;
+  // If the Python tool already provided a narrative or summary, use it!
+  const existingSummary = data?.narrative || data?.summary;
+  if (existingSummary && existingSummary !== "Analysis completed. Narrative deferred." && existingSummary !== "Macro summary unavailable.") {
+    return existingSummary;
   }
 
   // Optimization: Remove large historical price series from the data sent to the LLM.
-  // The LLM only needs the high-level metrics and signals to summarize,
-  // while the full series is still sent to the frontend for chart rendering.
+  // The LLM only needs the high-level metrics and signals to summarize.
   const makeLiteData = (obj) => {
     if (Array.isArray(obj)) {
+      // If it's a very long array of numbers, it's definitely trading data
+      if (obj.length > 20 && typeof obj[0] === 'number') return "[Long data series omitted]";
       return obj.map(makeLiteData);
     } else if (obj !== null && typeof obj === 'object') {
       const lite = {};
       for (const [key, value] of Object.entries(obj)) {
-        if (['series', 'price_series', 'trend_labels', 'trend_datasets'].includes(key) || key.endsWith('_series')) {
+        // Exclude known large data keys
+        const excludeKeys = ['series', 'price_series', 'trend_labels', 'trend_datasets', 'history', 'ohlcv', 'candles'];
+        if (excludeKeys.includes(key) || key.endsWith('_series') || key.endsWith('_history')) {
           continue;
         }
+        
+        // Special case: for news_headlines, we only need titles for the summary
+        if (key === 'news_headlines' && Array.isArray(value)) {
+          lite[key] = value.slice(0, 10).map(n => ({ title: n.title }));
+          continue;
+        }
+
         lite[key] = makeLiteData(value);
       }
       return lite;
@@ -85,7 +96,7 @@ async function maybeSummarize({ tool, data, model, provider }) {
   const summary = await generateChatSummary({
     model,
     provider,
-    prompt: `Turn this structured QuantBot result into a concise chat answer. Preserve key numbers.\n\n${JSON.stringify({ tool, data: liteData }, null, 2).slice(0, 10000)}`
+    prompt: `Turn this structured QuantBot result into a concise chat answer. Preserve key numbers.\n\n${JSON.stringify({ tool, data: liteData }, null, 2).slice(0, 8000)}`
   });
   return summary || base;
 }
