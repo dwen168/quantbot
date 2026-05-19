@@ -226,7 +226,10 @@ flowchart LR
 4. **Language Bridge**: `mcpClient.js` invokes the Python sub-process (via JSON-RPC over `stdio`) to call the corresponding `recommend_stock` tool.
 5. **Quantitative Execution**: The Python `mcp_server` fetches data via `yfinance_client` and `rba_client`, calculates scores using `analysis/scoring.py`, and returns a structured Pydantic-validated payload.
 6. **UI Assembly**: `chartBuilder.js` transforms the raw Python result into an array of "UI Widgets" (JSON descriptors for heroes, tables, and trade plans).
-7. **Conversational Layer**: If the Python tool already provided a narrative, the chat route uses it directly. Otherwise, `llmService.js` is called to turn the raw data into a concise, human-friendly summary for the chat bubble.
+7. **Conversational Layer (LLM Short-Circuit)**: 
+   * **Primary Path**: The Python `llm_narrative.py` engine generates a domain-specific research narrative alongside the quantitative data.
+   * **Short-Circuit Optimization**: If `chat.js` detects the `narrative` field in the Python payload, it **bypasses** the Node.js LLM call entirely, rendering the text directly to the user.
+   * **Fallback Path**: If the Python narrative is missing (or if the query was a general conversational intent), Node's `llmService.js` is invoked as a fallback to generate a summary.
 8. **Real-time Delivery**: The chat router streams progress events (e.g., 25%, 50%) to the client. Finally, it sends a `complete` event containing the text and the widget array.
 9. **Rendering**: `chat.js` consumes the SSE stream, updates the chat history and passes the widget data to `dashboard.js`, which performs the final DOM construction and initializes the charts.
 
