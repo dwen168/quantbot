@@ -4,6 +4,7 @@ import math
 
 import pandas as pd
 
+from mcp_server.data.mock_client import get_mock_technical_indicators
 from mcp_server.data.yfinance_client import get_ohlcv, normalize_asx_ticker
 from mcp_server.models.technical import (
     Momentum,
@@ -115,7 +116,12 @@ def _signals(latest: pd.Series) -> list[str]:
     return signals
 
 
-def get_technical_indicators(ticker: str, period: str = "2y") -> TechnicalIndicators:
+def get_technical_indicators(ticker: str, period: str = "2y", use_mock: bool = False) -> TechnicalIndicators:
+    if use_mock:
+        data = get_mock_technical_indicators(ticker)
+        data.is_mock = True
+        return data
+
     symbol = normalize_asx_ticker(ticker)
     try:
         df = _add_indicators(get_ohlcv(symbol, period))

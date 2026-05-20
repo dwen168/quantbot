@@ -4,6 +4,7 @@ from datetime import date
 
 from mcp_server.analysis.llm_narrative import generate_narrative
 from mcp_server.analysis.scoring import score_stock
+from mcp_server.data.mock_client import get_mock_stock_analysis
 from mcp_server.data.yfinance_client import get_info, normalize_asx_ticker
 from mcp_server.models.recommendation import (
     AnalysisScores,
@@ -44,10 +45,15 @@ def _key_levels(prices: list[float], current: float | None, atr: float | None = 
     )
 
 
-def analyze_stock(ticker: str, include_narrative: bool = True, model: str | None = None, provider: str | None = None) -> StockAnalysis:
+def analyze_stock(ticker: str, include_narrative: bool = True, model: str | None = None, provider: str | None = None, use_mock: bool = False) -> StockAnalysis:
+    if use_mock:
+        data = get_mock_stock_analysis(ticker)
+        data.is_mock = True
+        return data
+
     symbol = normalize_asx_ticker(ticker)
-    technical = get_technical_indicators(ticker, "2y")
-    regime = get_macro_regime(include_narrative=False)
+    technical = get_technical_indicators(ticker, "2y", use_mock=use_mock)
+    regime = get_macro_regime(include_narrative=False, use_mock=use_mock)
     info = get_info(symbol)
     sector = info.get("sector")
     scored = score_stock(technical, regime, sector=sector)

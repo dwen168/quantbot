@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from mcp_server.analysis.llm_narrative import generate_narrative
+from mcp_server.data.mock_client import get_mock_recommendation
 from mcp_server.models.recommendation import MarketContext, PriceGuidance, Recommendation
 from mcp_server.tools.analysis import analyze_stock
 from mcp_server.tools.market_snapshot import get_market_snapshot
@@ -28,8 +29,13 @@ def _risk_level(score: int, bearish_count: int) -> str:
     return "LOW"
 
 
-def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None) -> Recommendation:
-    analysis = analyze_stock(ticker, include_narrative=False)
+def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None, use_mock: bool = False) -> Recommendation:
+    if use_mock:
+        data = get_mock_recommendation(ticker)
+        data.is_mock = True
+        return data
+
+    analysis = analyze_stock(ticker, include_narrative=False, use_mock=use_mock)
     score = analysis.scores.combined_score
     action, conviction = _decision(score)
 

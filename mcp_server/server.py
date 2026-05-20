@@ -22,33 +22,33 @@ mcp = FastMCP("QuantBot ASX")
 
 
 @mcp.tool()
-def get_technical_indicators(ticker: str, period: str = "2y") -> dict:
+def get_technical_indicators(ticker: str, period: str = "2y", use_mock: bool = False) -> dict:
     """Fetch ASX OHLCV data and calculate technical indicators."""
-    return get_technical_indicators_impl(ticker, period).model_dump()
+    return get_technical_indicators_impl(ticker, period, use_mock=use_mock).model_dump()
 
 
 @mcp.tool()
-def get_market_snapshot() -> dict:
+def get_market_snapshot(use_mock: bool = False) -> dict:
     """Return a display-oriented market overview (prices, news, commodities) for the user."""
-    return get_market_snapshot_impl().model_dump()
+    return get_market_snapshot_impl(use_mock=use_mock).model_dump()
 
 
 @mcp.tool()
-def get_macro_regime(model: str | None = None, provider: str | None = None) -> dict:
+def get_macro_regime(model: str | None = None, provider: str | None = None, use_mock: bool = False) -> dict:
     """Return structural economic signals and regime context used for analysis and scoring."""
-    return get_macro_regime_impl(model=model, provider=provider).model_dump()
+    return get_macro_regime_impl(model=model, provider=provider, use_mock=use_mock).model_dump()
 
 
 @mcp.tool()
-def analyze_stock(ticker: str, model: str | None = None, provider: str | None = None) -> dict:
+def analyze_stock(ticker: str, model: str | None = None, provider: str | None = None, use_mock: bool = False) -> dict:
     """Synthesize technical and macro data into a structured stock analysis."""
-    return analyze_stock_impl(ticker, model=model, provider=provider).model_dump()
+    return analyze_stock_impl(ticker, model=model, provider=provider, use_mock=use_mock).model_dump()
 
 
 @mcp.tool()
-def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None) -> dict:
+def recommend_stock(ticker: str, model: str | None = None, provider: str | None = None, use_mock: bool = False) -> dict:
     """Convert stock analysis into a buy, sell, or hold recommendation."""
-    return recommend_stock_impl(ticker, model=model, provider=provider).model_dump()
+    return recommend_stock_impl(ticker, model=model, provider=provider, use_mock=use_mock).model_dump()
 
 
 def main() -> None:

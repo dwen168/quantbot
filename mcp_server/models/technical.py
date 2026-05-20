@@ -67,4 +67,5 @@ class TechnicalIndicators(BaseModel):
     volume: VolumeData = Field(default_factory=VolumeData)
     signals: list[str] = Field(default_factory=list)
     price_series: list[TechnicalCandle] = Field(default_factory=list)
+    is_mock: bool = False
     error: str | None = None

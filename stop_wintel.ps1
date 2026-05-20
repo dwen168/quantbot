@@ -22,8 +22,8 @@ if (Test-Path "quantbot.pid") {
 
 Write-Host "Cleaning up lingering processes..." -ForegroundColor Yellow
 # Find and stop processes that match our services
-# This targets common command line patterns for this app
-$lingering = Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%chatbot/server/index.js%' OR CommandLine LIKE '%mcp_server.server%'"
+# This targets common command line patterns for this app (using wildcard % to support both Windows and Unix path separators)
+$lingering = Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%chatbot%server%index.js%' OR CommandLine LIKE '%mcp_server.server%'"
 if ($lingering) {
     $lingering | ForEach-Object {
         Write-Host "Stopping lingering process: $($_.ProcessId)"

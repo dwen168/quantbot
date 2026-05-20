@@ -52,6 +52,7 @@ class StockAnalysis(BaseModel):
     bearish_signals: list[SignalFactor] = Field(default_factory=list)
     risk_factors: list[SignalFactor] = Field(default_factory=list)
     narrative: str | None = None
+    is_mock: bool = False
 
 
 class PriceGuidance(BaseModel):
@@ -86,3 +87,4 @@ class Recommendation(BaseModel):
     market_context: MarketContext = Field(default_factory=MarketContext)
     underlying_analysis: StockAnalysis
     narrative: str | None = None
+    is_mock: bool = False

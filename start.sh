@@ -5,6 +5,18 @@ cd "$(dirname "$0")"
 
 echo "Starting Quantbot services..."
 
+# Check if python3 is installed
+if ! command -v python3 &> /dev/null; then
+    echo "Error: python3 is not installed or not in PATH." >&2
+    exit 1
+fi
+
+# Check if npm is installed
+if ! command -v npm &> /dev/null; then
+    echo "Error: Node.js (npm) is not installed or not in PATH." >&2
+    exit 1
+fi
+
 # Ensure virtual environment exists
 if [ ! -d ".venv" ]; then
     echo "Creating Python virtual environment..."

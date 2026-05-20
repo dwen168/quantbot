@@ -143,6 +143,7 @@ class MarketSnapshot(BaseModel):
     commodities: Commodities = Field(default_factory=Commodities)
     global_indices: GlobalIndices = Field(default_factory=GlobalIndices)
     news_headlines: list[NewsItem] = Field(default_factory=list)
+    is_mock: bool = False
     errors: list[str] = Field(default_factory=list)
 
 
@@ -160,4 +161,5 @@ class MacroRegime(BaseModel):
     news_headlines: list[NewsItem] = Field(default_factory=list)
     geopolitical_context: str | None = None
     summary: str
+    is_mock: bool = False
     errors: list[str] = Field(default_factory=list)

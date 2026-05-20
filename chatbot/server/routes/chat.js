@@ -102,7 +102,7 @@ async function maybeSummarize({ tool, data, model, provider }) {
 }
 
 router.post("/", async (req, res) => {
-  const { message, model, provider } = req.body || {};
+  const { message, model, provider, isMock } = req.body || {};
   
   // Set headers for SSE
   res.writeHead(200, {
@@ -182,7 +182,7 @@ router.post("/", async (req, res) => {
     }
 
     sendSSE(res, { type: "progress", pct: 40, message: `Requesting ${tool.replace(/_/g, " ")} data...` });
-    const params = { ...routed.params, model, provider };
+    const params = { ...routed.params, model, provider, use_mock: isMock };
     if (tool === "get_technical_indicators" && !params.period) {
       params.period = "2y";
     }
@@ -209,7 +209,7 @@ router.post("/", async (req, res) => {
     
     sendSSE(res, { 
       type: "complete", 
-      payload: { message: responseMessage, tool, params, rawData, charts, widgets } 
+      payload: { message: responseMessage, tool, params, rawData, charts, widgets, isMock: rawData?.is_mock } 
     });
     res.end();
   } catch (error) {

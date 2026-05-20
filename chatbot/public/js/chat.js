@@ -154,6 +154,9 @@ export function initChat() {
   const input = document.getElementById("chat-input");
   const modelSelect = document.getElementById("model-select");
   const providerBtns = document.querySelectorAll(".provider-btn");
+  const modeBtns = document.querySelectorAll(".mode-btn");
+
+  let activeMode = "live";
 
   // Keep track of manual model changes
   modelSelect.addEventListener("change", () => {
@@ -169,6 +172,17 @@ export function initChat() {
       activeProvider = provider;
       providerBtns.forEach(b => b.classList.toggle("active", b === btn));
       updateModelSelect();
+    });
+  });
+
+  // Mode switching (Live vs Mock)
+  modeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      if (mode === activeMode) return;
+      
+      activeMode = mode;
+      modeBtns.forEach(b => b.classList.toggle("active", b === btn));
     });
   });
 
@@ -227,7 +241,8 @@ export function initChat() {
           message,
           history: history.slice(-20),
           model: modelSelect.value || undefined,
-          provider: activeProvider
+          provider: activeProvider,
+          isMock: activeMode === "mock"
         })
       });
 

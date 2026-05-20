@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 
 import pandas as pd
 
+from mcp_server.data.mock_client import get_mock_market_snapshot
 from mcp_server.data.macro_core import SECTOR_PROXIES, fetch_macro_core
 from mcp_server.data.yfinance_client import get_news, get_ohlcv
 from mcp_server.models.macro import (
@@ -78,7 +79,12 @@ def _history(ticker: str, period: str = "3mo") -> list[dict] | None:
         return None
 
 
-def get_market_snapshot() -> MarketSnapshot:
+def get_market_snapshot(use_mock: bool = False) -> MarketSnapshot:
+    if use_mock:
+        data = get_mock_market_snapshot()
+        data.is_mock = True
+        return data
+
     """
     Step 4: New display-oriented tool.
     Focuses on 'What is happening in the market right now?'

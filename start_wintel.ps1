@@ -16,6 +16,12 @@ if (-not (Test-Path ".venv")) {
     }
 }
 
+# Ensure Node.js/npm exists
+if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
+    Write-Error "Node.js (npm) not found. Please install Node.js and add it to your PATH."
+    exit 1
+}
+
 # Activate venv and install python dependencies
 Write-Host "Installing/Updating Python dependencies..." -ForegroundColor Yellow
 & ".\.venv\Scripts\python.exe" -m pip install -e ".[dev]" | Out-Null

@@ -5,6 +5,7 @@ from datetime import date
 import pandas as pd
 
 from mcp_server.data import abs_client
+from mcp_server.data.mock_client import get_mock_macro_regime
 from mcp_server.data.macro_core import SECTOR_PROXIES, fetch_macro_core
 from mcp_server.data.yfinance_client import get_ohlcv
 from mcp_server.models.macro import (
@@ -47,7 +48,12 @@ def _vix_regime(vix: float | None) -> str:
 
 from mcp_server.analysis.llm_narrative import generate_narrative
 
-def get_macro_regime(include_narrative: bool = True, model: str | None = None, provider: str | None = None) -> MacroRegime:
+def get_macro_regime(include_narrative: bool = True, model: str | None = None, provider: str | None = None, use_mock: bool = False) -> MacroRegime:
+    if use_mock:
+        data = get_mock_macro_regime()
+        data.is_mock = True
+        return data
+
     """
     Step 4: New analysis-oriented tool.
     Focuses on 'What is underlying economic environment?'
