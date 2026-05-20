@@ -55,9 +55,15 @@ function buildStockCharts(data) {
         changePct: data.price_change_pct,
         trend: data.trend?.trend_signal,
         volumeRatio: data.volume?.volume_ratio,
+        fullWidth: true,
       },
 
-      // Row 2: Three indicator groups side by side
+      // Row 2: Price Action Chart (Moved from charts array)
+      chart("price-action", "candlestick", "2Y Price Action", {
+        series: data.price_series || []
+      }, { fullWidth: true, isChart: true }),
+
+      // Row 3: Three indicator groups side by side
       {
         id: "indicators-group",
         type: "group",
@@ -104,11 +110,7 @@ function buildStockCharts(data) {
       // Row 4: Signals (full width)
       signals("technical-signals", "Technical Signals", data.signals),
     ],
-    charts: [
-      chart("price-action", "candlestick", "2Y Price Action", {
-        series: data.price_series || []
-      }, { fullWidth: true }),
-    ]
+    charts: []
   };
 }
 
@@ -126,7 +128,9 @@ function buildMarketSnapshotCharts(data) {
         price: data.asx_market?.asx200_level,
         changePct: data.asx_market?.asx200_1d_change,
         trend: null,
-        fullWidth: true
+        fullWidth: true,
+        isIndex: true,
+        priceLabel: "Index Level"
       },
 
       // 2. FX with Sparklines — Half-width
@@ -341,7 +345,8 @@ function buildAnalysisCharts(data) {
         techScore,
         macroScore,
         bullishCount: techBullish.length + macroBullish.length,
-        bearishCount: techBearish.length + macroRisks.length
+        bearishCount: techBearish.length + macroRisks.length,
+        fullWidth: true
       },
 
       // 1. Technical Assessment — Flattened into 3 columns
@@ -425,7 +430,8 @@ function buildRecommendationCharts(data) {
         action: data.action,
         conviction: data.conviction,
         riskLevel: data.risk_level,
-        horizon: data.time_horizon
+        horizon: data.time_horizon,
+        fullWidth: true
       },
 
       // 2. Analyst Narrative — Immediate context after the verdict

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { logLLMPerformance } from "../utils/llmTrace.js";
 
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
@@ -36,7 +37,7 @@ export async function listOllamaModels() {
 
 export async function listModels() {
   const ollama = await listOllamaModels();
-  const gemini = process.env.GOOGLE_API_KEY ? ["gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-1.5-pro"] : [];
+  const gemini = process.env.GOOGLE_API_KEY ? ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.1-pro"] : [];
   return { ollama, gemini };
 }
 
@@ -49,7 +50,7 @@ export async function preferredModel(requestedModel, provider = "ollama") {
   }
   
   if (provider === "gemini") {
-    return requestedModel || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
+    return requestedModel || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
   }
   
   // Consistency: First priority should be the OLLAMA_MODEL from .env
@@ -67,9 +68,10 @@ export async function preferredModel(requestedModel, provider = "ollama") {
 async function generateGeminiSummary({ prompt, model }) {
   if (!process.env.GOOGLE_API_KEY) return null;
   
+  const startTime = Date.now();
+  const targetModel = model || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
   try {
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    const targetModel = model || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
     const genModel = genAI.getGenerativeModel({ 
       model: targetModel,
       systemInstruction: "Write concise, practical ASX market chatbot responses in markdown."
@@ -77,9 +79,24 @@ async function generateGeminiSummary({ prompt, model }) {
 
     const result = await genModel.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    
+    logLLMPerformance({
+      model: targetModel,
+      duration: Date.now() - startTime,
+      input: prompt,
+      source: "chatbot-gemini"
+    });
+    
+    return text;
   } catch (e) {
     console.error("Gemini generation failed:", e);
+    logLLMPerformance({
+      model: targetModel,
+      duration: Date.now() - startTime,
+      input: `ERROR: ${e.message} | Prompt: ${prompt}`,
+      source: "chatbot-gemini"
+    });
     return null;
   }
 }
@@ -94,6 +111,7 @@ async function generateOllamaSummary({ prompt, model }) {
 
   for (const currentModel of modelsToTry) {
     if (!currentModel) continue;
+    const startTime = Date.now();
     try {
       const response = await fetch(`${baseUrl}/api/chat`, {
         method: "POST",
@@ -107,13 +125,34 @@ async function generateOllamaSummary({ prompt, model }) {
           ]
         })
       });
+      
+      const duration = Date.now() - startTime;
       if (response.ok) {
         const data = await response.json();
         if (data.message?.content) {
+          logLLMPerformance({
+            model: currentModel,
+            duration,
+            input: prompt,
+            source: "chatbot-ollama"
+          });
           return data.message.content;
         }
       }
+      
+      logLLMPerformance({
+        model: currentModel,
+        duration,
+        input: `FAILED (HTTP ${response.status}) | Prompt: ${prompt}`,
+        source: "chatbot-ollama"
+      });
     } catch (e) {
+      logLLMPerformance({
+        model: currentModel,
+        duration: Date.now() - startTime,
+        input: `ERROR: ${e.message} | Prompt: ${prompt}`,
+        source: "chatbot-ollama"
+      });
       continue;
     }
   }
@@ -121,20 +160,36 @@ async function generateOllamaSummary({ prompt, model }) {
 }
 
 export async function generateJsonCompletion({ prompt, systemInstruction, provider = "ollama", model }) {
+  const startTime = Date.now();
   if (provider === "gemini" || (model && model.startsWith("gemini-"))) {
     if (!process.env.GOOGLE_API_KEY) return null;
+    const targetModel = model || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
     try {
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-      const targetModel = model || process.env.GOOGLE_MODEL || "gemini-1.5-flash";
       const genModel = genAI.getGenerativeModel({ 
         model: targetModel,
         systemInstruction,
         generationConfig: { responseMimeType: "application/json" }
       });
       const result = await genModel.generateContent(prompt);
-      return result.response.text();
+      const text = result.response.text();
+      
+      logLLMPerformance({
+        model: targetModel,
+        duration: Date.now() - startTime,
+        input: `[JSON] ${prompt}`,
+        source: "chatbot-json-gemini"
+      });
+      
+      return text;
     } catch (e) {
       console.error("Gemini JSON generation failed:", e);
+      logLLMPerformance({
+        model: targetModel,
+        duration: Date.now() - startTime,
+        input: `[JSON ERROR] ${e.message} | Prompt: ${prompt}`,
+        source: "chatbot-json-gemini"
+      });
       return null;
     }
   }
@@ -156,12 +211,33 @@ export async function generateJsonCompletion({ prompt, systemInstruction, provid
         ]
       })
     });
+    
+    const duration = Date.now() - startTime;
     if (response.ok) {
       const data = await response.json();
+      logLLMPerformance({
+        model: targetModel,
+        duration,
+        input: `[JSON] ${prompt}`,
+        source: "chatbot-json-ollama"
+      });
       return data.message?.content;
     }
+    
+    logLLMPerformance({
+      model: targetModel,
+      duration,
+      input: `[JSON FAILED] HTTP ${response.status} | Prompt: ${prompt}`,
+      source: "chatbot-json-ollama"
+    });
   } catch (e) {
     console.error("Ollama JSON generation failed:", e);
+    logLLMPerformance({
+      model: targetModel,
+      duration: Date.now() - startTime,
+      input: `[JSON ERROR] ${e.message} | Prompt: ${prompt}`,
+      source: "chatbot-json-ollama"
+    });
   }
   return null;
 }

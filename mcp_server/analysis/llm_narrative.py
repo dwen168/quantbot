@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import subprocess
+import time
 from typing import Any
 
 import httpx
+
+from .trace_logger import log_llm_performance
 
 
 _MODEL_CACHE: str | None = None
@@ -74,6 +77,7 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
         if not any(target_model in m for m in available_models) and target_model not in priorities:
             continue
 
+        start_time = time.time()
         try:
             response = httpx.post(
                 f"{base_url}/api/chat",
@@ -87,11 +91,15 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
                 },
                 timeout=30,
             )
+            duration = (time.time() - start_time) * 1000
             if response.status_code == 200:
+                log_llm_performance(target_model, duration, prompt, source="mcp-ollama")
                 return response.json().get("message", {}).get("content")
             
             error_data = response.json() if response.headers.get("Content-Type") == "application/json" else {"error": response.text}
             print(f"Ollama error ({target_model}): {error_data.get('error')}", file=os.sys.stderr)
+            
+            log_llm_performance(target_model, duration, f"FAILED (HTTP {response.status_code}): {error_data.get('error')} | Prompt: {prompt}", source="mcp-ollama")
             
             # If the error is about loading the model, try the next one
             if "unable to load model" in str(error_data.get("error")).lower():
@@ -101,7 +109,9 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
                 continue
                 
         except Exception as e:
+            duration = (time.time() - start_time) * 1000
             print(f"Ollama connection error ({target_model}): {e}", file=os.sys.stderr)
+            log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-ollama")
             continue
             
     return None
@@ -112,6 +122,7 @@ def _openai(prompt: str, model: str | None = None) -> str | None:
     if not api_key:
         return None
     target_model = model if (model and not model.startswith("gemini-") and not model.startswith("claude-")) else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    start_time = time.time()
     try:
         response = httpx.post(
             "https://api.openai.com/v1/chat/completions",
@@ -123,10 +134,14 @@ def _openai(prompt: str, model: str | None = None) -> str | None:
             },
             timeout=30,
         )
+        duration = (time.time() - start_time) * 1000
         response.raise_for_status()
+        log_llm_performance(target_model, duration, prompt, source="mcp-openai")
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
+        duration = (time.time() - start_time) * 1000
         print(f"OpenAI error ({target_model}): {e}", file=os.sys.stderr)
+        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-openai")
         return None
 
 
@@ -135,6 +150,7 @@ def _anthropic(prompt: str, model: str | None = None) -> str | None:
     if not api_key:
         return None
     target_model = model if (model and model.startswith("claude-")) else os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+    start_time = time.time()
     try:
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",
@@ -149,11 +165,16 @@ def _anthropic(prompt: str, model: str | None = None) -> str | None:
             },
             timeout=30,
         )
+        duration = (time.time() - start_time) * 1000
         response.raise_for_status()
         content: list[dict[str, Any]] = response.json().get("content", [])
-        return "".join(block.get("text", "") for block in content if block.get("type") == "text") or None
+        text = "".join(block.get("text", "") for block in content if block.get("type") == "text") or None
+        log_llm_performance(target_model, duration, prompt, source="mcp-anthropic")
+        return text
     except Exception as e:
+        duration = (time.time() - start_time) * 1000
         print(f"Anthropic error ({target_model}): {e}", file=os.sys.stderr)
+        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-anthropic")
         return None
 
 
@@ -164,8 +185,8 @@ def _gemini(prompt: str, model: str | None = None) -> str | None:
     
     # Correcting model ID logic: if 'model' looks like a gemini model, use it. 
     # Otherwise use default or env.
-    target_model = model if (model and model.startswith("gemini-")) else os.getenv("GOOGLE_MODEL", "gemini-1.5-flash")
-    
+    target_model = model if (model and model.startswith("gemini-")) else os.getenv("GOOGLE_MODEL", "gemini-3.1-flash-lite")
+    start_time = time.time()
     try:
         # Use v1 stable API instead of v1beta if possible, or ensure correct v1beta usage
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
@@ -177,13 +198,20 @@ def _gemini(prompt: str, model: str | None = None) -> str | None:
             },
             timeout=30,
         )
+        duration = (time.time() - start_time) * 1000
         response.raise_for_status()
         candidates = response.json().get("candidates", [])
         if candidates:
-            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
+            text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
+            log_llm_performance(target_model, duration, prompt, source="mcp-gemini")
+            return text
+        
+        log_llm_performance(target_model, duration, f"FAILED (No candidates) | Prompt: {prompt}", source="mcp-gemini")
         return None
     except Exception as e:
+        duration = (time.time() - start_time) * 1000
         print(f"Gemini error ({target_model}): {e}", file=os.sys.stderr)
+        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-gemini")
         return None
 
 

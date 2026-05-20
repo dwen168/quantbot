@@ -436,18 +436,22 @@ function renderStockHero(widget) {
     </div>
   ` : "";
 
+  const isIndex = widget.isIndex || (widget.symbol && (widget.symbol.includes("ASX") || widget.symbol.startsWith("^")));
+  const pricePrefix = isIndex ? "" : "$";
+  const priceLabel = widget.priceLabel || (isIndex ? "Index Level" : "Last Price (AUD)");
+
   card.innerHTML = `
     <div class="stock-hero-left">
       <div class="stock-hero-symbol">${widget.symbol || "—"}</div>
-      <div class="stock-hero-price">${widget.price != null ? '$' + widget.price : "n/a"}</div>
-      <div class="stock-hero-price-label">Last Price (AUD)</div>
+      <div class="stock-hero-price">${widget.price != null ? pricePrefix + widget.price : "n/a"}</div>
+      <div class="stock-hero-price-label">${priceLabel}</div>
     </div>
     <div class="stock-hero-divider"></div>
     <div class="stock-hero-right">
       ${trendChipHtml ? `<div class="stock-hero-trend-row">${trendChipHtml}${trendNoteHtml}</div>` : ""}
       <div class="stock-hero-stats">
         <div class="stock-hero-stat">
-          <span class="stock-stat-label">${widget.trend ? '2Y Period Change' : 'Today\'s Change'}</span>
+          <span class="stock-stat-label">${widget.trend ? '2Y Period Change' : (isIndex ? 'Today\'s Change' : 'Today\'s Change')}</span>
           <span class="stock-stat-value ${changeClass}">${changeLabel}</span>
         </div>
         ${volHtml}
@@ -1090,13 +1094,18 @@ export function render(response, sessionId) {
     }
   }
 
-  // Render full-width charts first
+  // Render full-width widgets first (Heroes, Banners, etc.)
+  for (const widget of widgets.filter(w => w.fullWidth)) {
+    section.append(renderWidget(widget));
+  }
+
+  // Render full-width charts
   for (const chart of charts.filter((item) => item.fullWidth)) {
     section.append(renderChart(chart));
   }
 
-  // Render widgets
-  for (const widget of widgets) {
+  // Render non-full-width widgets
+  for (const widget of widgets.filter(w => !w.fullWidth)) {
     section.append(renderWidget(widget));
   }
 
