@@ -133,64 +133,53 @@ function buildMarketSnapshotCharts(data) {
         priceLabel: "Index Level"
       },
 
-      // 2. FX with Sparklines — Half-width
-      miniCharts("fx-sparklines", "Foreign Exchange", [
-        { label: "AUD/USD", value: data.currencies?.aud_usd != null ? `1D: ${fmt(data.currencies.aud_usd_1mo_change, "%")}` : "n/a", series: data.currencies?.aud_usd_series },
-        { label: "AUD/CNY", value: data.currencies?.aud_cny, series: data.currencies?.aud_cny_series },
-      ]),
+      // 2. Metals Trends (Full Width Tiled)
+      miniCharts("metals", "Metals Trends (3M)", [
+        { label: "Gold (USD)", value: data.commodities?.gold_usd, series: data.commodities?.gold_usd_series },
+        { label: "Copper (USD)", value: data.commodities?.copper_usd, series: data.commodities?.copper_usd_series },
+        { label: "Iron Ore", value: data.commodities?.iron_ore_etf_proxy, series: data.commodities?.iron_ore_series },
+      ], { fullWidth: true }),
 
-      // 3. Commodities & Rates - Combined Trends and Info
+      // 3. Energy Trends (Full Width Tiled)
+      miniCharts("energy", "Energy Trends (3M)", [
+        { label: "Crude Oil", value: data.commodities?.crude_oil_usd, series: data.commodities?.crude_oil_usd_series },
+        { label: "Coal Proxy", value: data.commodities?.coal_proxy_ticker, series: data.commodities?.coal_series },
+      ], { fullWidth: true }),
+
+      // 4. FX & Rates (Flattened/Grouped)
       {
-        id: "commodities-group",
+        id: "fx-rates-group",
         type: "group",
+        fullWidth: true,
         columns: 2,
         widgets: [
-          miniCharts("metals", "Metals Trends (3M)", [
-            { label: "Gold (USD)", value: data.commodities?.gold_usd, series: data.commodities?.gold_usd_series },
-            { label: "Copper (USD)", value: data.commodities?.copper_usd, series: data.commodities?.copper_usd_series },
-            { label: "Iron Ore", value: data.commodities?.iron_ore_etf_proxy, series: data.commodities?.iron_ore_series },
+          miniCharts("fx-sparklines", "Foreign Exchange", [
+            { label: "AUD/USD", value: data.currencies?.aud_usd != null ? `1D: ${fmt(data.currencies.aud_usd_1mo_change, "%")}` : "n/a", series: data.currencies?.aud_usd_series },
+            { label: "AUD/CNY", value: data.currencies?.aud_cny, series: data.currencies?.aud_cny_series },
           ]),
-          {
-            id: "energy-rates-group",
-            type: "group",
-            columns: 1,
-            widgets: [
-              miniCharts("energy", "Energy Trends (3M)", [
-                { label: "Crude Oil", value: data.commodities?.crude_oil_usd, series: data.commodities?.crude_oil_usd_series },
-                { label: "Coal Proxy", value: data.commodities?.coal_proxy_ticker, series: data.commodities?.coal_series },
-              ]),
-              kv("rates-info", "Rates & News", [
-                ["RBA Cash Rate", fmt(data.asx_market?.rba_cash_rate, "%")],
-              ], { hideBadges: true })
-            ]
-          }
+          kv("rates-info", "Current Rates", [
+            ["RBA Cash Rate", fmt(data.asx_market?.rba_cash_rate, "%")],
+          ], { hideBadges: true })
         ]
       },
 
-      // 4. Sector Performance - Consolidated Card
-      {
-        id: "sector-performance-group",
-        type: "group",
-        title: "Sector Performance",
-        fullWidth: true,
-        columns: 1,
-        widgets: [
-          miniCharts("sector-trends", "3-Month Sector Trends", sectors.map(s => ({
-            label: s.name,
-            value: s.one_d_pct != null ? `1D: ${fmt(s.one_d_pct, "%")}` : "n/a",
-            series: s.series
-          }))),
-          chart("sector-performance-bar", "bar", "Daily Performance (%)", {
-            indexAxis: "y",
-            labels: sectors.map(s => s.name),
-            datasets: [{
-              data: sectors.map(s => s.one_d_pct),
-              backgroundColor: sectors.map(s => (s.one_d_pct >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)")),
-              borderRadius: 4
-            }]
-          }, { isChart: true })
-        ]
-      },
+      // 5. Sector Performance
+      miniCharts("sector-trends", "3-Month Sector Trends", sectors.map(s => ({
+        label: s.name,
+        value: s.one_d_pct != null ? `1D: ${fmt(s.one_d_pct, "%")}` : "n/a",
+        series: s.series
+      })), { fullWidth: true }),
+
+      // 5. Sector Performance Bar Chart
+      chart("sector-performance-bar", "bar", "Sector Daily Performance (%)", {
+        indexAxis: "y",
+        labels: sectors.map(s => s.name),
+        datasets: [{
+          data: sectors.map(s => s.one_d_pct),
+          backgroundColor: sectors.map(s => (s.one_d_pct >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)")),
+          borderRadius: 4
+        }]
+      }, { isChart: true, fullWidth: true }),
 
       // 5. Global Indices - Consolidated Card
       {

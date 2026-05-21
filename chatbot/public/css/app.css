@@ -1016,7 +1016,17 @@ body.light .news-card { background: rgba(0, 0, 0, 0.02); }
 .news-title { font-size: 14px; font-weight: 500; line-height: 1.5; }
 .news-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; align-items: center; margin-top: auto; }
 
-.mini-charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.mini-charts-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+  gap: 16px; 
+}
+@media (max-width: 1400px) {
+  .mini-charts-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+@media (max-width: 600px) {
+  .mini-charts-grid { grid-template-columns: 1fr; }
+}
 .mini-chart-card { padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 12px; }
 body.light .mini-chart-card { background: rgba(0, 0, 0, 0.02); }
 .mini-chart-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; font-weight: 600; }
