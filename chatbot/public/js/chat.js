@@ -183,6 +183,16 @@ export function initChat() {
       
       activeMode = mode;
       modeBtns.forEach(b => b.classList.toggle("active", b === btn));
+
+      // Update status label
+      const statusLabel = document.getElementById("status-label");
+      const statusContainer = document.querySelector(".topbar-status");
+      if (statusLabel) {
+        statusLabel.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+      }
+      if (statusContainer) {
+        statusContainer.classList.toggle("mock", mode === "mock");
+      }
     });
   });
 

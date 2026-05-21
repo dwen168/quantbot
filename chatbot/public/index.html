@@ -33,13 +33,6 @@
         </div>
 
         <div class="topbar-settings">
-          <div class="mode-toggle">
-            <span class="mode-label">Mode</span>
-            <div class="toggle-group">
-              <button type="button" class="mode-btn active" data-mode="live">Live</button>
-              <button type="button" class="mode-btn" data-mode="mock">Mock</button>
-            </div>
-          </div>
           <div class="provider-toggle">
             <button type="button" class="provider-btn active" data-provider="ollama">Ollama</button>
             <button type="button" class="provider-btn" data-provider="gemini">Gemini</button>
@@ -53,9 +46,16 @@
         </div>
 
         <div class="topbar-actions">
+          <div class="mode-toggle">
+            <span class="mode-label">Mode</span>
+            <div class="toggle-group">
+              <button type="button" class="mode-btn active" data-mode="live">Live</button>
+              <button type="button" class="mode-btn" data-mode="mock">Mock</button>
+            </div>
+          </div>
           <div class="topbar-status">
             <span class="status-dot"></span>
-            <span class="status-label">Live</span>
+            <span id="status-label" class="status-label">Live</span>
           </div>
           <button id="how-it-works-btn" class="icon-button" type="button" title="How it works" aria-label="How it works">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

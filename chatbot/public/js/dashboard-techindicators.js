@@ -1,45 +1,73 @@
 import { el, chartInstances, resizeObservers, currentContext } from "./dashboard-components.js";
 
 export const indicatorExplanations = {
-  "RSI": "Relative Strength Index: Measures momentum. > 70 is generally overbought, < 30 is oversold.",
-  "MACD": "Moving Average Convergence Divergence: A trend-following momentum indicator showing the relationship between two moving averages.",
-  "ADX": "Average Directional Index: Measures the strength of a trend. > 25 indicates a strong trend.",
-  "Stoch": "Stochastic Oscillator: A momentum indicator. > 80 is generally overbought, < 20 is oversold.",
-  "Upper": "Upper Bollinger Band: Price touching or exceeding this may indicate an overbought condition.",
-  "Lower": "Lower Bollinger Band: Price touching or falling below this may indicate an oversold condition.",
-  "Width": "Bollinger Band Width: Measures market volatility. Wider means high volatility.",
-  "SMA": "Simple Moving Average: The average price over a specific number of periods.",
-  "EMA": "Exponential Moving Average: A moving average that gives more weight to recent prices.",
-  "Trend": "The general direction of the market or price of an asset.",
-  "Cash Rate": "The interest rate set by the RBA for overnight loans between banks. Influences all other interest rates.",
-  "AU 10Y": "Australian 10-Year Government Bond Yield. A key benchmark for long-term interest rates.",
-  "Yield Curve": "The difference between long-term and short-term interest rates. An inverted curve can signal an economic slowdown.",
-  "Regime": "The current macroeconomic environment classification based on rates and growth.",
-  "CPI YoY": "Consumer Price Index Year-over-Year. A primary measure of broad inflation.",
-  "Trimmed Mean": "Core inflation measure that excludes the most volatile price changes.",
-  "Above Target": "Indicates whether current inflation is exceeding the central bank's target.",
-  "Target": "The central bank's target range for inflation (e.g., 2-3% for RBA).",
-  "Shanghai YTD": "Year-to-date performance of the Shanghai Composite Index. Indicates Chinese market health.",
-  "AUD/CNY 3M": "3-month change in the Australian Dollar vs Chinese Yuan exchange rate. Reflects trade dynamics.",
-  "Iron Ore Proxy YTD": "Year-to-date performance of major iron ore miners. Serves as a proxy for Chinese industrial demand.",
-  "Signal": "Overall algorithmic assessment (e.g., bullish/bearish, tailwind/headwind).",
-  "Level": "Current index level.",
-  "1D": "1-day percentage change.",
-  "Technical Score": "Quantitative score (-100 to +100) based on momentum, trend, moving averages, and volatility.",
-  "Macro Score": "Quantitative score (-100 to +100) based on interest rates, China exposure, commodities, and risk sentiment.",
-  "Combined Score": "Weighted combination of Technical (60%) and Macro (40%) scores. > 40 implies Buy, < -40 implies Sell.",
-  "1M": "1-month percentage change.",
-  "YTD": "Year-to-date percentage change.",
-  "Direction": "Current direction of central bank monetary policy.",
-  "Last Change": "Date of the last policy rate change.",
-  "Change": "Magnitude of the last policy rate change.",
-  "AUD/USD": "Australian Dollar vs US Dollar exchange rate.",
-  "Gold": "Gold price in USD per ounce. Often viewed as a safe-haven asset.",
-  "Oil": "Crude oil price in USD. A key driver of global inflation and economic costs.",
-  "Copper": "Copper price in USD. Often seen as a leading indicator of global economic health."
+  // --- Technical Indicators ---
+  "RSI": "Relative Strength Index: Measures momentum. > 70 is overbought (risk of pullback), < 30 is oversold (potential bounce).",
+  "MACD": "Moving Average Convergence Divergence: Shows the relationship between two moving averages of a security's price. Crosses are key signals.",
+  "ADX": "Average Directional Index: Measures trend strength. > 25 indicates a strong trend, < 20 suggests a range-bound market.",
+  "ATR": "Average True Range: A volatility indicator showing how much an asset moves, on average, during a given time frame.",
+  "Stoch": "Stochastic Oscillator: A momentum indicator comparing a closing price to its price range over a period. > 80 is overbought, < 20 is oversold.",
+  "Upper": "Upper Bollinger Band: Represents +2 standard deviations. Prices touching this are statistically high.",
+  "Middle": "Middle Bollinger Band: The 20-period moving average that serves as the base for the Bollinger Bands.",
+  "Lower": "Lower Bollinger Band: Represents -2 standard deviations. Prices touching this are statistically low.",
+  "Width": "Bollinger Band Width: A volatility gauge. Narrowing 'squeeze' often precedes a major price breakout.",
+  "SMA": "Simple Moving Average: The arithmetic mean of price over a specific period (e.g., 20, 50, or 200 days).",
+  "EMA": "Exponential Moving Average: A moving average that places a greater weight and significance on the most recent data points.",
+  "Trend": "The prevailing direction of price movement. Bullish (Up), Bearish (Down), or Neutral (Side-ways).",
+  "Volume Ratio": "Current volume relative to the average. > 1.5 indicates high conviction in the current price move.",
+  "Volatility": "A measure of the dispersion of returns. High volatility indicates large price swings and higher risk.",
+  "Volume": "The number of shares or contracts traded. High volume confirms the strength of a price trend.",
+
+  // --- Price Targets & Trade Planning ---
+  "Support": "A price level where a downtrend tends to pause due to a concentration of demand (buying interest).",
+  "Resistance": "A price level where an uptrend tends to pause due to a concentration of supply (selling interest).",
+  "Stop Loss": "A pre-defined price level to exit a losing trade to prevent further capital erosion.",
+  "Target Price": "The projected price level where a trade is expected to be profitable and closed.",
+  "Entry": "The suggested price range or 'zone' to initiate a new position for optimal risk/reward.",
+
+  // --- Macro & Economic (Domestic) ---
+  "Cash Rate": "The RBA's target interest rate for overnight loans between banks. The anchor for all Australian interest rates.",
+  "CPI YoY": "Consumer Price Index: The primary measure of inflation. RBA targets a 2-3% band.",
+  "Inflation": "The rate at which the general level of prices for goods and services is rising.",
+  "GDP Growth": "The annual growth rate of the Australian economy. Measures structural health.",
+  "Unemployment": "The percentage of the labor force that is jobless and actively seeking work.",
+  "AU 10Y": "Australian 10-Year Government Bond Yield. Reflects long-term inflation and growth expectations.",
+  "Yield Curve": "The spread between long and short-term debt. An inversion (short > long) often warns of recession.",
+  "Regime": "The current policy environment. Restrictive (High rates) vs Accommodative (Low rates).",
+  "Rates Headwind": "Indicates if rising or high interest rates are creating a negative environment for the stock.",
+  "China Tailwind": "Indicates if positive economic data or demand from China is benefiting the stock.",
+  "ASX Vol 20D": "The 20-day realized volatility of the ASX 200 index. Measures recent market stress.",
+  "ASX200 Level": "The current price level of the S&P/ASX 200 index, Australia's primary stock market benchmark.",
+
+  // --- Global Markets & Commodities ---
+  "S&P 500": "Standard & Poor's 500: An index of 500 leading US publicly traded companies. The global equity benchmark.",
+  "Nasdaq": "The tech-heavy US index. Highly sensitive to interest rate changes and growth sentiment.",
+  "Shanghai": "Shanghai Composite Index: The primary indicator for the Chinese economy and a key driver for ASX miners.",
+  "Hang Seng": "Hong Kong's main stock index. Reflects Asian financial sentiment and China's offshore market.",
+  "AUD/USD": "The 'Aussie' dollar vs the US dollar. High levels favor importers; low levels favor exporters and miners.",
+  "AUD/CNY": "The Australian Dollar vs the Chinese Yuan. Critical for trade dynamics with Australia's largest partner.",
+  "Gold": "USD Gold price. Traditionally a 'safe haven' asset that rises during geopolitical stress or high inflation.",
+  "Crude Oil": "The global energy benchmark. High prices drive inflation and input costs for most businesses.",
+  "Copper": "Often called 'Dr. Copper' because it's a leading indicator of global industrial and economic health.",
+  "Iron Ore": "Australia's top export. Performance is highly correlated with Chinese infrastructure and steel demand.",
+
+  // --- Scoring & Analysis ---
+  "Technical Score": "Algorithmic score (-100 to +100) based on trend, momentum, and volatility signals.",
+  "Macro Score": "Algorithmic score (-100 to +100) based on RBA policy, China data, and global risk sentiment.",
+  "Combined Score": "The final weighted score (60% Tech / 40% Macro) used to generate the trade verdict.",
+  "Conviction": "The statistical confidence in the current recommendation based on signal strength.",
+  "Risk Level": "The estimated volatility and downside potential of the current trade setup.",
+  "Verdict": "The final analyst conclusion: Buy (Bullish), Sell (Bearish), or Hold (Neutral).",
+  "Risk Sentiment": "The prevailing market mood. 'Risk-On' (Bullish/Aggressive) vs 'Risk-Off' (Bearish/Defensive).",
+  "VIX": "The CBOE Volatility Index. Known as the 'Fear Gauge', it rises when market uncertainty increases.",
+  "Signal": "The aggregated directional indicator (e.g., Bullish/Bearish) for a specific data set.",
 };
 
 export function getIndicatorExplanation(label) {
+  // Prioritize exact matches
+  if (indicatorExplanations[label]) return indicatorExplanations[label];
+
+  // Then partial matches
   for (const [key, text] of Object.entries(indicatorExplanations)) {
     if (label.includes(key)) return text;
   }

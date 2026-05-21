@@ -267,8 +267,24 @@ body.light .topbar-settings {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-right: 16px;
-  border-right: 1px solid var(--panel-border);
+}
+
+.topbar-status.mock {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.topbar-status.mock .status-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
+.topbar-status.mock .status-dot::after {
+  border-color: #f59e0b;
+}
+
+.topbar-status.mock .status-label {
+  color: #f59e0b;
 }
 
 .mode-label {
@@ -1536,5 +1552,51 @@ body.light .skeleton {
 @media (max-width: 600px) {
   .verdict-grid { grid-template-columns: 1fr; }
 }
+
+/* TOOLTIP STYLES */
+.has-tooltip {
+  position: relative;
+  cursor: help;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 3px;
+}
+
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  transform: translateY(-8px);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: var(--font-inter);
+  font-weight: 500;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: none;
+  letter-spacing: normal;
+  backdrop-filter: var(--glass);
+}
+
+.has-tooltip:hover::after {
+  opacity: 1;
+  transform: translateY(-12px);
+}
+
+body.light .has-tooltip::after {
+  background: #fff;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
 
 
