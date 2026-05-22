@@ -37,7 +37,7 @@ export async function listOllamaModels() {
 
 export async function listModels() {
   const ollama = await listOllamaModels();
-  const gemini = process.env.GOOGLE_API_KEY ? ["Gemini 2.5 Flash-Lite", "Gemma 4"] : [];
+  const gemini = process.env.GOOGLE_API_KEY ? ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"] : ["DeepSeek-v4-flash"];
   return { ollama, gemini };
 }
 
@@ -68,9 +68,49 @@ export async function preferredModel(requestedModel, provider = "ollama") {
 function mapGeminiModel(model) {
   const map = {
     "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
-    "Gemma 4": "gemma-4-31b-it"
+    "Gemma 4": "gemma-4-31b-it",
+    "DeepSeek-v4-flash": "deepseek-v4-flash"
   };
   return map[model] || model || "gemini-2.5-flash-lite";
+}
+
+async function generateDeepSeekSummary({ prompt, model, systemInstruction }) {
+  if (!process.env.DEEPSEEK_API_KEY) return null;
+  const startTime = Date.now();
+  const targetModel = model || "deepseek-v4-flash";
+  try {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: targetModel,
+        messages: [
+          { role: "system", content: systemInstruction || "Write concise, practical ASX market chatbot responses in markdown." },
+          { role: "user", content: prompt }
+        ],
+        stream: false
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.choices[0]?.message?.content;
+      logLLMPerformance({
+        model: targetModel,
+        duration: Date.now() - startTime,
+        input: prompt,
+        source: "chatbot-deepseek"
+      });
+      return text;
+    }
+    return null;
+  } catch (e) {
+    console.error("DeepSeek generation failed:", e);
+    return null;
+  }
 }
 
 async function withRetry(fn, retries = 3, delay = 1000) {
@@ -94,14 +134,20 @@ async function withRetry(fn, retries = 3, delay = 1000) {
 }
 
 async function generateGeminiSummary({ prompt, model }) {
-  if (!process.env.GOOGLE_API_KEY) return null;
-  
   const startTime = Date.now();
   const primaryModel = model || process.env.GOOGLE_MODEL || "Gemini 2.5 Flash-Lite";
-  const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4"];
+  const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"];
   const modelsToTry = [primaryModel, ...onlineModels.filter(m => m !== primaryModel)];
 
   for (const currentModel of modelsToTry) {
+    if (currentModel === "DeepSeek-v4-flash") {
+      const res = await generateDeepSeekSummary({ prompt, model: "deepseek-v4-flash" });
+      if (res) return res;
+      continue;
+    }
+
+    if (!process.env.GOOGLE_API_KEY) continue;
+    
     const targetModelId = mapGeminiModel(currentModel);
     try {
       return await withRetry(async () => {
@@ -199,14 +245,21 @@ async function generateOllamaSummary({ prompt, model }) {
 
 export async function generateJsonCompletion({ prompt, systemInstruction, provider = "ollama", model }) {
   const startTime = Date.now();
-  if (provider === "gemini" || (model && model.startsWith("gemini-")) || (model && ["Gemini 2.5 Flash-Lite", "Gemma 4"].includes(model))) {
-    if (!process.env.GOOGLE_API_KEY) return null;
+  if (provider === "gemini" || (model && model.startsWith("gemini-")) || (model && ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"].includes(model))) {
     
     const primaryModel = model || process.env.GOOGLE_MODEL || "Gemini 2.5 Flash-Lite";
-    const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4"];
+    const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"];
     const modelsToTry = [primaryModel, ...onlineModels.filter(m => m !== primaryModel)];
 
     for (const currentModel of modelsToTry) {
+      if (currentModel === "DeepSeek-v4-flash") {
+        const res = await generateDeepSeekSummary({ prompt, model: "deepseek-v4-flash", systemInstruction });
+        if (res) return res;
+        continue;
+      }
+
+      if (!process.env.GOOGLE_API_KEY) continue;
+      
       const targetModelId = mapGeminiModel(currentModel);
       try {
         return await withRetry(async () => {
@@ -292,7 +345,7 @@ export async function generateJsonCompletion({ prompt, systemInstruction, provid
 }
 
 export async function generateChatSummary({ prompt, model, provider = "ollama" }) {
-  if (provider === "gemini" || (model && (model.startsWith("gemini-") || ["Gemini 2.5 Flash-Lite", "Gemma 4"].includes(model)))) {
+  if (provider === "gemini" || (model && (model.startsWith("gemini-") || ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"].includes(model)))) {
     return await generateGeminiSummary({ prompt, model });
   }
   return await generateOllamaSummary({ prompt, model });

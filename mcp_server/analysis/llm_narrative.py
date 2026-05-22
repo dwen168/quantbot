@@ -121,23 +121,59 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
 def map_gemini_model(model: str | None) -> str:
     mapping = {
         "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
-        "Gemma 4": "gemma-4-31b-it"
+        "Gemma 4": "gemma-4-31b-it",
+        "DeepSeek-v4-flash": "deepseek-v4-flash"
     }
     if not model:
         return os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
     return mapping.get(model, model)
 
 
-def _gemini(prompt: str, model: str | None = None) -> str | None:
-    api_key = os.getenv("GOOGLE_API_KEY")
+def _deepseek(prompt: str, model: str | None = None) -> str | None:
+    api_key = os.getenv("DEEPSEEK_API_KEY")
     if not api_key:
         return None
+    target_model = model or "deepseek-v4-flash"
+    start_time = time.time()
+    try:
+        response = httpx.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": target_model,
+                "messages": [
+                    {"role": "system", "content": "Write concise ASX stock analysis. No financial advice disclaimer."},
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False,
+            },
+            timeout=30,
+        )
+        duration = (time.time() - start_time) * 1000
+        if response.status_code == 200:
+            log_llm_performance(target_model, duration, prompt, source="mcp-deepseek")
+            return response.json().get("choices", [{}])[0].get("message", {}).get("content")
+        return None
+    except Exception as e:
+        print(f"DeepSeek error: {e}", file=os.sys.stderr)
+        return None
+
+
+def _gemini(prompt: str, model: str | None = None) -> str | None:
+    api_key = os.getenv("GOOGLE_API_KEY")
     
     primary_model = model or os.getenv("GOOGLE_MODEL", "Gemini 2.5 Flash-Lite")
-    online_models = ["Gemini 2.5 Flash-Lite", "Gemma 4"]
+    online_models = ["Gemini 2.5 Flash-Lite", "Gemma 4", "DeepSeek-v4-flash"]
     models_to_try = [primary_model] + [m for m in online_models if m != primary_model]
 
     for current_model in models_to_try:
+        if current_model == "DeepSeek-v4-flash":
+            res = _deepseek(prompt)
+            if res: return res
+            continue
+
+        if not api_key: continue
+        
         target_model_id = map_gemini_model(current_model)
         for i in range(3): # 3 retries
             start_time = time.time()
