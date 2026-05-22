@@ -134,24 +134,11 @@ router.post("/", async (req, res) => {
       sendSSE(res, { type: "progress", pct: 50, message: "Thinking about your question..." });
       let fallbackMessage = null;
       try {
-        if (process.env.OPENAI_API_KEY) {
-          const { default: OpenAI } = await import("openai");
-          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-          const completion = await client.chat.completions.create({
-            model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-            messages: [
-              { role: "system", content: "You are QuantBot, an AI assistant for Australian market analysis. The user asked a general question. Answer it helpfully and concisely in markdown." },
-              { role: "user", content: message }
-            ]
-          });
-          fallbackMessage = completion.choices[0]?.message?.content;
-        } else {
-          fallbackMessage = await generateChatSummary({
-            model,
-            provider,
-            prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
-          });
-        }
+        fallbackMessage = await generateChatSummary({
+          model,
+          provider,
+          prompt: `The user asked a general question: "${message}". Please answer it helpfully and concisely in markdown.`
+        });
       } catch (e) {
         console.error("Fallback LLM failed:", e);
       }

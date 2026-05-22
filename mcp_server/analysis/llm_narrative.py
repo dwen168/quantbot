@@ -117,65 +117,15 @@ def _ollama(prompt: str, model: str | None = None) -> str | None:
     return None
 
 
-def _openai(prompt: str, model: str | None = None) -> str | None:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return None
-    target_model = model if (model and not model.startswith("gemini-") and not model.startswith("claude-")) else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    start_time = time.time()
-    try:
-        response = httpx.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": target_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 250,
-            },
-            timeout=30,
-        )
-        duration = (time.time() - start_time) * 1000
-        response.raise_for_status()
-        log_llm_performance(target_model, duration, prompt, source="mcp-openai")
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        duration = (time.time() - start_time) * 1000
-        print(f"OpenAI error ({target_model}): {e}", file=os.sys.stderr)
-        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-openai")
-        return None
 
-
-def _anthropic(prompt: str, model: str | None = None) -> str | None:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
-    target_model = model if (model and model.startswith("claude-")) else os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
-    start_time = time.time()
-    try:
-        response = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            },
-            json={
-                "model": target_model,
-                "max_tokens": 250,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=30,
-        )
-        duration = (time.time() - start_time) * 1000
-        response.raise_for_status()
-        content: list[dict[str, Any]] = response.json().get("content", [])
-        text = "".join(block.get("text", "") for block in content if block.get("type") == "text") or None
-        log_llm_performance(target_model, duration, prompt, source="mcp-anthropic")
-        return text
-    except Exception as e:
-        duration = (time.time() - start_time) * 1000
-        print(f"Anthropic error ({target_model}): {e}", file=os.sys.stderr)
-        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-anthropic")
-        return None
+def map_gemini_model(model: str | None) -> str:
+    mapping = {
+        "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
+        "Gemma 4": "gemma-4-31b-it"
+    }
+    if not model:
+        return os.getenv("GOOGLE_MODEL", "gemini-2.5-flash-lite")
+    return mapping.get(model, model)
 
 
 def _gemini(prompt: str, model: str | None = None) -> str | None:
@@ -183,36 +133,50 @@ def _gemini(prompt: str, model: str | None = None) -> str | None:
     if not api_key:
         return None
     
-    # Correcting model ID logic: if 'model' looks like a gemini model, use it. 
-    # Otherwise use default or env.
-    target_model = model if (model and model.startswith("gemini-")) else os.getenv("GOOGLE_MODEL", "gemini-3.1-flash-lite")
-    start_time = time.time()
-    try:
-        # Use v1 stable API instead of v1beta if possible, or ensure correct v1beta usage
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
-        response = httpx.post(
-            url,
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "systemInstruction": {"parts": [{"text": "Write concise ASX stock analysis. No financial advice disclaimer."}]}
-            },
-            timeout=30,
-        )
-        duration = (time.time() - start_time) * 1000
-        response.raise_for_status()
-        candidates = response.json().get("candidates", [])
-        if candidates:
-            text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
-            log_llm_performance(target_model, duration, prompt, source="mcp-gemini")
-            return text
-        
-        log_llm_performance(target_model, duration, f"FAILED (No candidates) | Prompt: {prompt}", source="mcp-gemini")
-        return None
-    except Exception as e:
-        duration = (time.time() - start_time) * 1000
-        print(f"Gemini error ({target_model}): {e}", file=os.sys.stderr)
-        log_llm_performance(target_model, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-gemini")
-        return None
+    primary_model = model or os.getenv("GOOGLE_MODEL", "Gemini 2.5 Flash-Lite")
+    online_models = ["Gemini 2.5 Flash-Lite", "Gemma 4"]
+    models_to_try = [primary_model] + [m for m in online_models if m != primary_model]
+
+    for current_model in models_to_try:
+        target_model_id = map_gemini_model(current_model)
+        for i in range(3): # 3 retries
+            start_time = time.time()
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model_id}:generateContent?key={api_key}"
+                response = httpx.post(
+                    url,
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "systemInstruction": {"parts": [{"text": "Write concise ASX stock analysis. No financial advice disclaimer."}]}
+                    },
+                    timeout=30,
+                )
+                duration = (time.time() - start_time) * 1000
+                
+                if response.status_code == 503 or response.status_code == 429:
+                    if i < 2:
+                        time.sleep(1 * (2 ** i))
+                        continue
+
+                response.raise_for_status()
+                candidates = response.json().get("candidates", [])
+                if candidates:
+                    text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text")
+                    log_llm_performance(target_model_id, duration, prompt, source="mcp-gemini")
+                    return text
+                
+                log_llm_performance(target_model_id, duration, f"FAILED (No candidates) | Prompt: {prompt}", source="mcp-gemini")
+                break # Not a transient error, stop retrying this model
+            except Exception as e:
+                duration = (time.time() - start_time) * 1000
+                if i < 2:
+                    time.sleep(1 * (2 ** i))
+                    continue
+                else:
+                    print(f"Gemini error ({target_model_id}): {e}", file=os.sys.stderr)
+                    log_llm_performance(target_model_id, duration, f"ERROR: {str(e)} | Prompt: {prompt}", source="mcp-gemini")
+                    break
+    return None
 
 
 def generate_narrative(prompt: str, model: str | None = None, provider: str | None = None) -> str | None:
@@ -230,17 +194,9 @@ def generate_narrative(prompt: str, model: str | None = None, provider: str | No
     elif p == "gemini":
         res = _gemini(prompt, model=model)
         if res: return res
-    elif p == "openai":
-        res = _openai(prompt, model=model)
-        if res: return res
-    elif p == "anthropic":
-        res = _anthropic(prompt, model=model)
-        if res: return res
 
     # 2. If requested provider failed or none requested, try fallbacks in order of cost/locality
     return (
         _ollama(prompt, model=model) or 
-        _gemini(prompt, model=model) or 
-        _openai(prompt, model=model) or 
-        _anthropic(prompt, model=model)
+        _gemini(prompt, model=model)
     )

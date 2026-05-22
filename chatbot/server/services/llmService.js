@@ -37,7 +37,7 @@ export async function listOllamaModels() {
 
 export async function listModels() {
   const ollama = await listOllamaModels();
-  const gemini = process.env.GOOGLE_API_KEY ? ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.1-pro"] : [];
+  const gemini = process.env.GOOGLE_API_KEY ? ["Gemini 2.5 Flash-Lite", "Gemma 4"] : [];
   return { ollama, gemini };
 }
 
@@ -50,7 +50,7 @@ export async function preferredModel(requestedModel, provider = "ollama") {
   }
   
   if (provider === "gemini") {
-    return requestedModel || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
+    return requestedModel || process.env.GOOGLE_MODEL || "Gemini 2.5 Flash-Lite";
   }
   
   // Consistency: First priority should be the OLLAMA_MODEL from .env
@@ -65,40 +65,78 @@ export async function preferredModel(requestedModel, provider = "ollama") {
   return models[0] || "gemma4:e4b";
 }
 
+function mapGeminiModel(model) {
+  const map = {
+    "Gemini 2.5 Flash-Lite": "gemini-2.5-flash-lite",
+    "Gemma 4": "gemma-4-31b-it"
+  };
+  return map[model] || model || "gemini-2.5-flash-lite";
+}
+
+async function withRetry(fn, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i === retries - 1) throw e;
+      // Check for 503 (High Demand) or 429 (Rate Limit)
+      const isTransient = e.status === 503 || e.status === 429 || 
+                          e.message?.includes("503") || e.message?.includes("429") ||
+                          e.message?.includes("high demand");
+      if (isTransient) {
+        const waitTime = delay * Math.pow(2, i);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 async function generateGeminiSummary({ prompt, model }) {
   if (!process.env.GOOGLE_API_KEY) return null;
   
   const startTime = Date.now();
-  const targetModel = model || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
-  try {
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-    const genModel = genAI.getGenerativeModel({ 
-      model: targetModel,
-      systemInstruction: "Write concise, practical ASX market chatbot responses in markdown."
-    });
+  const primaryModel = model || process.env.GOOGLE_MODEL || "Gemini 2.5 Flash-Lite";
+  const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4"];
+  const modelsToTry = [primaryModel, ...onlineModels.filter(m => m !== primaryModel)];
 
-    const result = await genModel.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    
-    logLLMPerformance({
-      model: targetModel,
-      duration: Date.now() - startTime,
-      input: prompt,
-      source: "chatbot-gemini"
-    });
-    
-    return text;
-  } catch (e) {
-    console.error("Gemini generation failed:", e);
-    logLLMPerformance({
-      model: targetModel,
-      duration: Date.now() - startTime,
-      input: `ERROR: ${e.message} | Prompt: ${prompt}`,
-      source: "chatbot-gemini"
-    });
-    return null;
+  for (const currentModel of modelsToTry) {
+    const targetModelId = mapGeminiModel(currentModel);
+    try {
+      return await withRetry(async () => {
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+        const genModel = genAI.getGenerativeModel({ 
+          model: targetModelId,
+          systemInstruction: "Write concise, practical ASX market chatbot responses in markdown."
+        });
+
+        const result = await genModel.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        logLLMPerformance({
+          model: targetModelId,
+          duration: Date.now() - startTime,
+          input: prompt,
+          source: "chatbot-gemini"
+        });
+        
+        return text;
+      });
+    } catch (e) {
+      console.error(`Gemini generation failed for ${currentModel}:`, e.message);
+      // Continue to next model
+    }
   }
+
+  logLLMPerformance({
+    model: "ALL_ONLINE_FAILED",
+    duration: Date.now() - startTime,
+    input: `ERROR: All online models failed | Prompt: ${prompt}`,
+    source: "chatbot-gemini"
+  });
+  return null;
 }
 
 async function generateOllamaSummary({ prompt, model }) {
@@ -161,37 +199,48 @@ async function generateOllamaSummary({ prompt, model }) {
 
 export async function generateJsonCompletion({ prompt, systemInstruction, provider = "ollama", model }) {
   const startTime = Date.now();
-  if (provider === "gemini" || (model && model.startsWith("gemini-"))) {
+  if (provider === "gemini" || (model && model.startsWith("gemini-")) || (model && ["Gemini 2.5 Flash-Lite", "Gemma 4"].includes(model))) {
     if (!process.env.GOOGLE_API_KEY) return null;
-    const targetModel = model || process.env.GOOGLE_MODEL || "gemini-3.1-flash-lite";
-    try {
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-      const genModel = genAI.getGenerativeModel({ 
-        model: targetModel,
-        systemInstruction,
-        generationConfig: { responseMimeType: "application/json" }
-      });
-      const result = await genModel.generateContent(prompt);
-      const text = result.response.text();
-      
-      logLLMPerformance({
-        model: targetModel,
-        duration: Date.now() - startTime,
-        input: `[JSON] ${prompt}`,
-        source: "chatbot-json-gemini"
-      });
-      
-      return text;
-    } catch (e) {
-      console.error("Gemini JSON generation failed:", e);
-      logLLMPerformance({
-        model: targetModel,
-        duration: Date.now() - startTime,
-        input: `[JSON ERROR] ${e.message} | Prompt: ${prompt}`,
-        source: "chatbot-json-gemini"
-      });
-      return null;
+    
+    const primaryModel = model || process.env.GOOGLE_MODEL || "Gemini 2.5 Flash-Lite";
+    const onlineModels = ["Gemini 2.5 Flash-Lite", "Gemma 4"];
+    const modelsToTry = [primaryModel, ...onlineModels.filter(m => m !== primaryModel)];
+
+    for (const currentModel of modelsToTry) {
+      const targetModelId = mapGeminiModel(currentModel);
+      try {
+        return await withRetry(async () => {
+          const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+          const genModel = genAI.getGenerativeModel({ 
+            model: targetModelId,
+            systemInstruction,
+            generationConfig: { responseMimeType: "application/json" }
+          });
+          const result = await genModel.generateContent(prompt);
+          const text = result.response.text();
+          
+          logLLMPerformance({
+            model: targetModelId,
+            duration: Date.now() - startTime,
+            input: `[JSON] ${prompt}`,
+            source: "chatbot-json-gemini"
+          });
+          
+          return text;
+        });
+      } catch (e) {
+        console.error(`Gemini JSON generation failed for ${currentModel}:`, e.message);
+        // Continue to next model
+      }
     }
+
+    logLLMPerformance({
+      model: "ALL_ONLINE_JSON_FAILED",
+      duration: Date.now() - startTime,
+      input: `[JSON ERROR] All online models failed | Prompt: ${prompt}`,
+      source: "chatbot-json-gemini"
+    });
+    return null;
   }
 
   // Ollama JSON mode
@@ -243,7 +292,7 @@ export async function generateJsonCompletion({ prompt, systemInstruction, provid
 }
 
 export async function generateChatSummary({ prompt, model, provider = "ollama" }) {
-  if (provider === "gemini" || (model && model.startsWith("gemini-"))) {
+  if (provider === "gemini" || (model && (model.startsWith("gemini-") || ["Gemini 2.5 Flash-Lite", "Gemma 4"].includes(model)))) {
     return await generateGeminiSummary({ prompt, model });
   }
   return await generateOllamaSummary({ prompt, model });
