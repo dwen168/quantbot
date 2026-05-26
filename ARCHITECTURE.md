@@ -19,62 +19,75 @@ flowchart LR
 ## System High-Level Integration Diagram
 
 ```mermaid
-flowchart LR
+flowchart TD
+    %% Styling definitions
+    classDef frontend fill:#e8f4fd,stroke:#2b82c9,stroke-width:2px;
+    classDef orchestrator fill:#fef9e7,stroke:#f39c12,stroke-width:2px;
+    classDef mcp fill:#ebf5fb,stroke:#2980b9,stroke-width:2px;
+    classDef external fill:#fdedec,stroke:#e74c3c,stroke-width:2px;
 
-    User[User]
-
-    subgraph "Frontend"
-        ChatUI[Chat UI]
-        Dashboard[Dashboard UI]
-        SSE[SSE Stream Handler]
+    User([User])
+    
+    subgraph Frontend ["Frontend UI Tier (Client)"]
+        ChatUI["Chat UI<br/>(chat.js)"]
+        Dashboard["Dashboard UI<br/>(dashboard.js / components)"]
+        SSE["SSE Stream Handler<br/>(chat.js)"]
+    end
+    
+    subgraph NodeJS ["Node.js Orchestration Tier (Brain)"]
+        ChatRoute["Express Router<br/>(routes/chat.js)"]
+        IntentRouter["Intent Router<br/>(intentRouter.js)"]
+        MCPClient["MCP Client<br/>(mcpClient.js)"]
+        LLMService["LLM Service<br/>(llmService.js)"]
+        ChartBuilder["Chart Builder<br/>(chartBuilder.js)"]
+    end
+    
+    subgraph MCPServer ["Python MCP Server Tier (Specialist)"]
+        MCPTools["MCP Tools Interface<br/>(server.py)"]
+        Scoring["Quant Scoring Engine<br/>(scoring.py)"]
+        Narrative["LLM Narrative Engine<br/>(llm_narrative.py)"]
+        DataClients["Data Fetching Engine<br/>(yfinance, rba, abs clients)"]
+    end
+    
+    subgraph External ["External Data Sources"]
+        YF["Yahoo Finance API"]
+        RBA["RBA official data"]
+        ABS["ABS official statistics"]
     end
 
-    subgraph "NodeJS Orchestrator"
-        ChatRoute["/api/chat"]
-        IntentRouter[Intent Router]
-        MCPClient[MCP Client]
-        LLMService[LLM Service]
-        ChartBuilder[Chart Builder]
-    end
+    %% Apply Styles
+    class ChatUI,Dashboard,SSE frontend;
+    class ChatRoute,IntentRouter,MCPClient,LLMService,ChartBuilder orchestrator;
+    class MCPTools,Scoring,Narrative,DataClients mcp;
+    class YF,RBA,ABS external;
 
-    subgraph "MCP Server"
-        MCPTools[MCP Tools]
-        Scoring[Quant Scoring Engine]
-        Narrative[LLM Narrative Engine]
-    end
-
-    subgraph "External Data"
-        YF[yFinance]
-        RBA[RBA Data]
-        ABS[ABS Data]
-    end
-
-    User --> ChatUI
-    ChatUI --> SSE
-    SSE --> ChatRoute
-
-    ChatRoute --> IntentRouter
-
-    IntentRouter --> MCPClient
-    IntentRouter --> LLMService
-    LLMService --> ChatRoute
-
-    MCPClient --> MCPTools
-
-    MCPTools --> Scoring
-    MCPTools --> Narrative
-
-    Scoring --> YF
-    Scoring --> RBA
-    Scoring --> ABS
-
-    MCPTools --> ChatRoute
-    ChatRoute --> ChartBuilder
-    ChatRoute --> SSE
-    ChartBuilder --> Dashboard
-
-    SSE --> Dashboard
-
+    %% Data Flow
+    User -->|Type query| ChatUI
+    ChatUI -->|POST /api/chat| ChatRoute
+    
+    %% Orchestrator interactions
+    ChatRoute -->|1. Classify query| IntentRouter
+    ChatRoute -->|2. Call Python tools| MCPClient
+    ChatRoute -->|3. Build widgets layout| ChartBuilder
+    ChatRoute -->|"4. Summarize (Fallback/Lite)"| LLMService
+    
+    %% MCP communication
+    MCPClient <-->|JSON-RPC over stdio| MCPTools
+    
+    %% MCP internal architecture
+    MCPTools -->|"1. Fetch raw data"| DataClients
+    DataClients --> External
+    MCPTools -->|"2. Process & Analyze"| Scoring & Narrative
+    
+    %% External mappings
+    External -.-> YF
+    External -.-> RBA
+    External -.-> ABS
+    
+    %% Output pipeline back to User
+    ChatRoute -->|5. Stream Progress & Final JSON| SSE
+    SSE -->|Stream text answers| ChatUI
+    SSE -->|Inject JSON widgets| Dashboard
 ```
 
 ### A. Frontend (Client Tier)
@@ -145,31 +158,42 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant F as Frontend (JS)
-    participant B as Node.js (Brain)
-    participant M as MCP (Specialist)
-    participant D as Data (External)
+    autonumber
+    actor User as User / Browser
+    participant FE as Frontend UI<br/>(chat.js / dashboard.js)
+    participant BE as Express Router<br/>(routes/chat.js)
+    participant Router as Intent Router<br/>(intentRouter.js)
+    participant MCP as MCP Client<br/>(mcpClient.js)
+    participant Python as Python MCP Server<br/>(mcp_server/server.py)
 
-    U->>F: Types "Should I buy BHP?"
-    F->>B: POST /api/chat (SSE Stream)
-    activate B
-    B->>B: Intent Classification (BHP, RECOMMENDATION)
-    B->>M: Call tool: recommend_stock(ticker="BHP")
-    activate M
-    M->>D: Fetch Prices (yFinance)
-    M->>D: Fetch Macro Data (RBA/ABS)
-    D-->>M: Raw Data
-    M->>M: Quantitative Scoring & Analysis
-    M-->>B: Structured Analysis Payload
-    deactivate M
-    B->>B: ChartBuilder: Transform to UI Widgets
-    B->>B: LLMService: Generate Chat Narrative
-    B-->>F: Stream: Progress Updates (25%, 50%, 100%)
-    B-->>F: Stream: Complete Event (Text + Widgets)
-    deactivate B
-    F->>F: Dashboard.js: Render Charts & Tables
-    F-->>U: Displays Response & Interactive Dashboard
+    User->>FE: Types query (e.g. "Should I buy BHP?")
+    FE->>BE: POST /api/chat (Request Stream)
+    BE->>Router: routeIntent(message)
+    
+    rect rgb(240, 248, 255)
+        note over Router: Intent Classification Path
+        Router->>Router: 1. Fast regex checks (Macro/Snapshot)
+        Router->>Router: 2. Contextual LLM check (getIntentWithLLM)
+        Router->>Router: 3. Heuristic / extractTicker fallback
+    end
+    
+    Router-->>BE: Returns intent (RECOMMENDATION) & ticker (BHP)
+    BE->>MCP: callTool("recommend_stock", {ticker: "BHP"})
+    MCP->>Python: JSON-RPC (StdioTransport)
+    
+    rect rgb(245, 245, 245)
+        note over Python: Quantitative & AI Narrative Execution
+        Python->>Python: Fetch data (Yahoo Finance / RBA)
+        Python->>Python: Compute quant multi-factor scores
+        Python->>Python: Generate domain research narrative (LLM)
+        Python->>Python: Validate output via Pydantic Schema
+    end
+    
+    Python-->>MCP: Returns structured result
+    MCP-->>BE: Delivers payload
+    BE->>BE: Optimize & Summarize context (if needed)
+    BE-->>FE: Stream SSE progress(25%,50%,75%,100%) & final Widgets JSON
+    FE->>User: Render real-time text, interactive charts, and trade plan
 ```
 
 ### Internal MCP Lifecycle
@@ -226,6 +250,7 @@ flowchart LR
     ToolLayer -- "5. Validate Schema" --> ContractLayer
     ContractLayer -- "Structured Result" --> Entry
 ```
+
 
 1. **Initiation**: `app.js` initializes the layout and theme. User types "Should I buy BHP?" in the chat input.
 2. **Streaming Request**: `chat.js` sends a request to `POST /api/chat` and immediately begins reading the response body as a `ReadableStream` for real-time SSE updates.

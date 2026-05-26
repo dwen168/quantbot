@@ -15,7 +15,14 @@ function projectRoot() {
 }
 
 function pythonBin() {
-  return process.env.PYTHON_BIN || path.join(projectRoot(), ".venv/bin/python");
+  if (process.env.PYTHON_BIN) {
+    return process.env.PYTHON_BIN;
+  }
+  const isWin = process.platform === "win32";
+  const pythonRelativePath = isWin
+    ? path.join(".venv", "Scripts", "python.exe")
+    : path.join(".venv", "bin", "python");
+  return path.join(projectRoot(), pythonRelativePath);
 }
 
 async function connect() {
