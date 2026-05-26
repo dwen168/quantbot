@@ -83,7 +83,13 @@ flowchart LR
 * **`public/index.html`**: SPA shell with a split-pane layout (Chat left, Dashboard right).
 * **`public/js/app.js`**: The main entry point. Orchestrates the global state, theme persistence (Light/Dark mode), and handles the split-pane resizing logic.
 * **`public/js/chat.js`**: Core UI controller. Handles real-time communication via **Server-Sent Events (SSE)**, renders message bubbles, and manages the SSE progress bar and per-response duration.
-* **`public/js/dashboard.js`**: A specialized rendering engine that transforms JSON widget descriptors from the server into interactive UI components (Charts, Hero cards, Tables).
+* **`public/js/dashboard.js`**: Global dashboard coordinator. Handles skeleton views, session switching, and routes JSON widget payloads to modular UI sub-components.
+* **`public/js/dashboard-components.js`**: Shared component core. Implements basic cards (KV lists, Tables, News feeds, Sparklines) and controls resizing listeners and theme synchronization.
+* **`public/js/dashboard-techindicators.js`**: Dedicated renderer for technical analyses. Formulates custom `stock-hero` metrics, SMA/EMA spreadsheets (`ma-table`), and comprehensive candlestick charts using Lightweight Charts.
+* **`public/js/dashboard-macroregime.js`**: Orchestrates `macro-hero` rendering, mapping economic and regulatory levels to responsive visual layouts.
+* **`public/js/dashboard-analyzestock.js`**: Renders structural quantitative elements such as the `score-hero` scorecard (with dynamic formula visualization) and granular indicator descriptions.
+* **`public/js/dashboard-recommmendstock.js`**: Governs action recommendation cards (`hero`) and target transaction parameters (`price-plan`).
+* **`public/js/dashboard-marketsnapshot.js`**: Combines individual dashboard widgets into a comprehensive composite index view.
 
 ### B. Chatbot Server (Orchestration Tier)
 
@@ -127,11 +133,12 @@ flowchart LR
     * **Macro Scores**: Interest rate regimes, VIX risk scaling, and China-linkage factors.
   * `llm_narrative.py`: Handles complex prompt construction to generate stock-specific analyst summaries.
 
-* **`mcp_server/data/`**: Specialized data clients.
+* **`mcp_server/data/`**: Specialized data clients and aggregators.
 
   * `yfinance_client.py`: Real-time market prices, history, and news.
   * `rba_client.py`: Official RBA cash rate data via CSV parsing.
   * `abs_client.py`: Key economic indicators (CPI, GDP, Unemployment) via stable RBA proxies.
+  * `macro_core.py`: Parallel fetching coordination engine (**`MacroCore`**) that retrieves indexes, commodities, and economic indicators simultaneously to minimize latency.
 
 
 ## 3. Data Flow & Routing
@@ -245,7 +252,13 @@ flowchart LR
 │   │   ├── js/              # Client-side Logic
 │   │   │   ├── app.js       # App Entry & Theme Logic
 │   │   │   ├── chat.js      # SSE Handler & Message UI
-│   │   │   └── dashboard.js # Widget Rendering Engine
+│   │   │   ├── dashboard.js # Widget Orchestration & Lifecycle Engine
+│   │   │   ├── dashboard-components.js      # Shared UI Widgets & Helpers
+│   │   │   ├── dashboard-techindicators.js  # Candle & Technical UI
+│   │   │   ├── dashboard-macroregime.js     # Macro Summary UI
+│   │   │   ├── dashboard-analyzestock.js    # Scoring & Formulas UI
+│   │   │   ├── dashboard-recommmendstock.js # Recommendation & Entry Plan UI
+│   │   │   └── dashboard-marketsnapshot.js  # Composite Index UI
 │   │   └── index.html       # SPA Container Shell
 │   ├── package.json         # Node.js Chatbot Config
 │   └── server/              # Server-side Logic
@@ -263,7 +276,8 @@ flowchart LR
 │   ├── data/                # Data Acquisition Clients
 │   │   ├── yfinance_client.py # Market Price & News API
 │   │   ├── rba_client.py     # RBA Official Data Parser
-│   │   └── abs_client.py     # ABS Economic Indicator Proxies
+│   │   ├── abs_client.py     # ABS Economic Indicator Proxies
+│   │   └── macro_core.py     # Parallel Data Retrieval Coordination Client
 │   ├── models/              # Pydantic Data Contracts (Schemas)
 │   ├── tools/               # Atomic MCP Capability Implementations
 │   └── server.py            # FastMCP Main Entry Point
